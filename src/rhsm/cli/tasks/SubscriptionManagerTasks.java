@@ -3920,6 +3920,7 @@ public class SubscriptionManagerTasks {
 		
 		// just return the result for the following cases:
 		if (sshCommandResult.getStdout().startsWith("This consumer is already subscribed") ||	// This consumer is already subscribed to the product matching pool with id 'ff8080812c71f5ce012c71f6996f0132'.
+			sshCommandResult.getStdout().startsWith("This unit has already had the subscription") ||	// This unit has already had the subscription matching pool ID '8a99f98340114f880140766376dc00cf' attached.
 			sshCommandResult.getStdout().startsWith("No entitlements are available") ||			// No entitlements are available from the pool with id '8a90f8143611c33f013611c4797b0456'.   (Bug 719743)
 			sshCommandResult.getStdout().startsWith("No subscriptions are available") ||		// No subscriptions are available from the pool with id '8a90f8303c98703a013c98715ca80494'.   (Bug 846758)
 			sshCommandResult.getStdout().startsWith("Pool is restricted") ||					// Pool is restricted to virtual guests: '8a90f85734205a010134205ae8d80403'.
@@ -6211,6 +6212,7 @@ repolist: 3,394
 		// Unfortunately these changes are present in candlepin master, but have not been deployed
 		// to hosted candlepin.
 		// For a short time the expected consumer/unit strings will be different depending on CandlepinType
-		return type.equals(CandlepinType.standalone);
+		//return type.equals(CandlepinType.standalone);
+		return true;	// candlepin in stage has been updated and now includes 876764
 	}
 }
