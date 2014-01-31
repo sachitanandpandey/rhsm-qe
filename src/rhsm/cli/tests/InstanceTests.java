@@ -109,7 +109,7 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 			InstalledProduct installedProduct = InstalledProduct.findFirstInstanceWithMatchingFieldFromList("productId", productId, currentlyInstalledProducts);
 			if (installedProduct!=null) {
 				providedProductIdsActuallyInstalled.add(installedProduct.productId);
-				List<String> expectedStatusDetails = Arrays.asList(new String[]{"Not covered by a valid subscription."});
+				List<String> expectedStatusDetails = Arrays.asList(new String[]{"Not supported by a valid subscription."});	// Message changed by candlepin commit 43a17952c724374c3fee735642bce52811a1e386	covers -> supports
 				if (installedProduct.statusDetails.isEmpty()) log.warning("Status Details appears empty.  Is your candlepin server older than 0.8.6?");
 				Assert.assertEquals(installedProduct.status,"Not Subscribed", "Since we have not yet consumed an instance based entitlement, the status of installed product '"+installedProduct.productName+"' should be this value.");
 				Assert.assertEquals(installedProduct.statusDetails,expectedStatusDetails,"Since we have not yet consumed an instance based entitlement, the status details of installed product '"+installedProduct.productName+"' is expected to be: "+expectedStatusDetails);
@@ -178,20 +178,22 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 			// pool, a subpool with unlimited quantity available only to the guests on this physical system will be generated.
 			
 			// start by attempting to subscribe in quantities that are NOT evenly divisible by the instance_multiplier
-			for (int qty=0; qty<=poolInstanceMultiplier+1; qty++) {
-				SSHCommandResult sshCommandResult = clienttasks.subscribe_(false,null,pool.poolId,null,null,String.valueOf(qty),null,null,null,null,null);
-				if (qty==0) {
-					Assert.assertEquals(sshCommandResult.getStdout().trim(), "Error: Quantity must be a positive integer.", "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which should be an error.");
-					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which should be an error.");
-					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(255), "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which should be an error.");
-				} else if (qty%poolInstanceMultiplier!=0) {
-					Assert.assertEquals(sshCommandResult.getStdout().trim(), String.format("Quantity '%s' is not a multiple of instance multiplier '%s'",qty,poolInstanceMultiplier), "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
-					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
-					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(1)/* TODO figure out if this is a bug.  should it be 255?*/, "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+			int quantityAttached=0;
+			for (int quantityAttempted=0; quantityAttempted<=poolInstanceMultiplier+1; quantityAttempted++) {
+				SSHCommandResult sshCommandResult = clienttasks.subscribe_(false,null,pool.poolId,null,null,String.valueOf(quantityAttempted),null,null,null,null,null);
+				if (quantityAttempted==0) {
+					Assert.assertEquals(sshCommandResult.getStdout().trim(), "Error: Quantity must be a positive integer.", "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which should be an error.");
+					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which should be an error.");
+					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(255), "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which should be an error.");
+				} else if (quantityAttempted%poolInstanceMultiplier!=0) {
+					Assert.assertEquals(sshCommandResult.getStdout().trim(), String.format("Subscription '%s' must be attached using a quantity evenly divisible by %s",pool.subscriptionName,poolInstanceMultiplier), "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");	// expected stdout message changed by Bug 1033365 - request to improve unfriendly message: Quantity '1' is not a multiple of instance multiplier '2'
+					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(1)/* TODO figure out if this is a bug.  should it be 255?*/, "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is not evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
 				} else {
-					Assert.assertEquals(sshCommandResult.getStdout().trim(), String.format("Successfully attached a subscription for: %s",pool.subscriptionName), "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
-					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
-					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(0), "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+qty+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+					Assert.assertEquals(sshCommandResult.getStdout().trim(), String.format("Successfully attached a subscription for: %s",pool.subscriptionName), "The stdout from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+					Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "The stderr from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+					Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(0), "The exit code from attempt to attach subscription '"+pool.subscriptionName+"' with quantity '"+quantityAttempted+"' which is evenly divisible by the instance_multiplier '"+poolInstanceMultiplier+"'.");
+					quantityAttached+=quantityAttempted;
 				}
 			}
 			
@@ -200,9 +202,9 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 			Assert.assertNotNull(productSubscription, "Found a consumed product subscription to '"+pool.subscriptionName+"' after manually subscribing.");
 			Assert.assertEquals(productSubscription.quantityUsed,Integer.valueOf(poolInstanceMultiplier),"The attached quantity of instance based subscription '"+pool.subscriptionName+"' in the list of consumed product subscriptions.");
 			if (poolInstanceMultiplier>=expectedQuantityToAchieveCompliance) {	// compliant when true
-				Assert.assertTrue(productSubscription.statusDetails.isEmpty(), "Status Details for consumed product subscription '"+productSubscription.productName+"' should be empty.  Actual="+productSubscription.statusDetails);
+				Assert.assertTrue(productSubscription.statusDetails.isEmpty(), "Indicated by an empty value, Status Details for consumed product subscription '"+productSubscription.productName+"' is compliant (Actual="+productSubscription.statusDetails+").");
 			} else {
-				List<String> expectedStatusDetails = Arrays.asList(new String[]{String.format("Only covers %s of %s sockets.",poolInstanceMultiplier,systemSockets)});
+				List<String> expectedStatusDetails = Arrays.asList(new String[]{String.format("Only supports %s of %s sockets.",(quantityAttached*poolSockets)/poolInstanceMultiplier,systemSockets)});	// Message changed by candlepin commit 43a17952c724374c3fee735642bce52811a1e386 covers -> supports
 				if (productSubscription.statusDetails.isEmpty()) log.warning("Status Details appears empty.  Is your candlepin server older than 0.8.6?");
 				Assert.assertEquals(productSubscription.statusDetails,expectedStatusDetails, "Status Details for consumed product subscription '"+productSubscription.productName+"'.  Expected="+expectedStatusDetails);
 			}
@@ -216,7 +218,7 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 						Assert.assertEquals(installedProduct.status,"Subscribed", "After manually attaching a quantity of '"+poolInstanceMultiplier+"' subscription '"+pool.subscriptionName+"' covering '"+poolSockets+"' sockets with instance_multiplier '"+poolInstanceMultiplier+"', the status of installed product '"+installedProduct.productName+"' on a physical system with '"+systemSockets+"' cpu_socket(s) should be this.");
 						Assert.assertTrue(installedProduct.statusDetails.isEmpty(), "Status Details for installed product '"+installedProduct.productName+"' should be empty.  Actual="+installedProduct.statusDetails);
 					} else {
-						List<String> expectedStatusDetails = Arrays.asList(new String[]{String.format("Only covers %s of %s sockets.",poolInstanceMultiplier,systemSockets)});
+						List<String> expectedStatusDetails = Arrays.asList(new String[]{String.format("Only supports %s of %s sockets.",(quantityAttached*poolSockets)/poolInstanceMultiplier,systemSockets)}); // Message changed by candlepin commit 43a17952c724374c3fee735642bce52811a1e386 covers -> supports
 						if (installedProduct.statusDetails.isEmpty()) log.warning("Status Details appears empty.  Is your candlepin server older than 0.8.6?");
 						Assert.assertEquals(installedProduct.status,"Partially Subscribed", "After manually attaching a quantity of '"+poolInstanceMultiplier+"' subscription '"+pool.subscriptionName+"' covering '"+poolSockets+"' sockets with instance_multiplier '"+poolInstanceMultiplier+"', the status of installed product '"+installedProduct.productName+"' on a physical system with '"+systemSockets+"' cpu_socket(s) should be this.");
 						Assert.assertEquals(installedProduct.statusDetails,expectedStatusDetails,"Status Details for installed product '"+installedProduct.productName+" should be this value: "+expectedStatusDetails);
@@ -229,19 +231,39 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 			clienttasks.unsubscribe(true, (BigInteger)null, null, null, null);
 			clienttasks.subscribe(true,null,(String)null,null,null,null,null,null,null,null,null);
 			*/
-			// instead let's attempt auto-subscribing which should hopefully complete the stack
+			// instead let's attempt auto-subscribing which should complete the stack
 			clienttasks.subscribe(true,null,(String)null,null,null,null,null,null,null,null,null);
 			
 			// assert the total quantity of consumption
 			if (!providedProductIdsActuallyInstalled.isEmpty()) {
+				/* The following algorithm neglects the case when multiple subscriptions by different names provide the installed products providedProductIdsActuallyInstalled.
 				List<ProductSubscription> productSubscriptions = ProductSubscription.findAllInstancesWithMatchingFieldFromList("productName", pool.subscriptionName, clienttasks.getCurrentlyConsumedProductSubscriptions());
-				Assert.assertTrue(!productSubscriptions.isEmpty(), "Found at lease one consumed product subscription to '"+pool.subscriptionName+"' after auto-subscribing.");
+				Assert.assertTrue(!productSubscriptions.isEmpty(), "Found at least one consumed product subscription to '"+pool.subscriptionName+"' after auto-subscribing.");
 				Integer totalQuantityUsed = 0;
 				for (ProductSubscription prodSub : productSubscriptions) {
 					totalQuantityUsed += prodSub.quantityUsed;
 					Assert.assertTrue(prodSub.statusDetails.isEmpty(),"Status Details of auto-attached subscription '"+pool.subscriptionName+"' covering '"+poolSockets+"' sockets with instance_multiplier '"+poolInstanceMultiplier+"' expected to achieve compliance of provided products '"+providedProductIdsActuallyInstalled+"' installed on a physical system with '"+systemSockets+"' cpu_socket(s) should be empty.  Actual="+prodSub.statusDetails);
 				}
 				Assert.assertEquals(totalQuantityUsed,Integer.valueOf(expectedQuantityToAchieveCompliance),"Quantity of auto-attached subscription '"+pool.subscriptionName+"' covering '"+poolSockets+"' sockets with instance_multiplier '"+poolInstanceMultiplier+"' expected to achieve compliance of provided products '"+providedProductIdsActuallyInstalled+"' installed on a physical system with '"+systemSockets+"' cpu_socket(s) should be this.");
+				Re-implementing a new algorithm below to count the number of system sockets covered and then assert that it autosubscribe successfully met coverage without excess over consumption...*/
+				float totalSocketsCovered = 0;	// among the consumed product subscriptions, this is the total stacked accumulation of socket coverage
+				Integer maxIncrementOfPhysicalSocketCoverage = new Integer(0);	// this is the maximum sockets attribute among the pools that provide for the installed products poolProvidedProductIds
+				List<ProductSubscription> productSubscriptions = new ArrayList<ProductSubscription>();
+				for (ProductSubscription prodSub : clienttasks.getCurrentlyConsumedProductSubscriptions()) {
+					List<String> thisPoolProvidedProductIds = CandlepinTasks.getPoolProvidedProductIds(sm_clientUsername, sm_clientPassword, sm_serverUrl, prodSub.poolId);
+					if (doesListOverlapList(thisPoolProvidedProductIds, providedProductIdsActuallyInstalled)) {
+						// the consumed quantity from this pool contributes to the socket coverage for installed products poolProvidedProductIds
+						Integer thisPoolInstanceMultiplier = Integer.valueOf(CandlepinTasks.getPoolProductAttributeValue(sm_clientUsername, sm_clientPassword, sm_serverUrl, prodSub.poolId, "instance_multiplier"));
+						Integer thisPoolSockets = Integer.valueOf(CandlepinTasks.getPoolProductAttributeValue(sm_clientUsername, sm_clientPassword, sm_serverUrl, prodSub.poolId, "sockets"));
+						maxIncrementOfPhysicalSocketCoverage=Math.max(maxIncrementOfPhysicalSocketCoverage, thisPoolSockets);
+						float socketsCoveredByThisPool = prodSub.quantityUsed.floatValue()*thisPoolSockets.floatValue()/thisPoolInstanceMultiplier.floatValue();
+						log.info("Attached product subscription '"+prodSub.productName+"' with quantity '"+prodSub.quantityUsed+"' contributes to '"+socketsCoveredByThisPool+"' cpu_socket(s) of coverage.");
+						totalSocketsCovered+=socketsCoveredByThisPool;
+						Assert.assertTrue(prodSub.statusDetails.isEmpty(),"Status Details of auto-attached subscription '"+prodSub.productName+"' covering '"+thisPoolSockets+"' sockets with instance_multiplier '"+thisPoolInstanceMultiplier+"' expected to contribute to the full compliance of provided products '"+providedProductIdsActuallyInstalled+"' installed on a physical system with '"+systemSockets+"' cpu_socket(s) should be empty.  Actual="+prodSub.statusDetails);
+					}
+				}
+				Assert.assertTrue(systemSockets+maxIncrementOfPhysicalSocketCoverage>totalSocketsCovered && totalSocketsCovered>=systemSockets, "After auto-subscribing to complete a stacked quantity of subscriptions providing for installed product ids '"+providedProductIdsActuallyInstalled+"', the total cpu_socket(s) coverage of '"+totalSocketsCovered+"' should minimally satistfy the system's physical socket count of '"+systemSockets+"' cpu_socket(s) within '"+maxIncrementOfPhysicalSocketCoverage+"' sockets of excess coverage.");
+
 			} else log.warning("There are no installed product ids '"+poolProvidedProductIds+"' to assert compliance status of instance-based subscription '"+pool.subscriptionName+"'.");
 			
 			// assert the installed provided products are compliant
@@ -319,14 +341,16 @@ public class InstanceTests extends SubscriptionManagerCLITestScript {
 				poolProductIdsQuantityMap.put(pool.productId, Integer.valueOf(pool.quantity)+poolProductIdsQuantityMap.get(pool.productId));
 
 			} else if (CandlepinTasks.isPoolProductInstanceBased(sm_clientUsername, sm_clientPassword, sm_serverUrl, pool.poolId)) {
+				BlockedByBzBug blockedByBzBug = null;
+				if (pool.productId.equals("RH00073")) blockedByBzBug = new BlockedByBzBug("1046158");	// Bug 1046158 - Attaching quantity=1 of SKU RH00073 on a 2 socket physical system yields "Only covers 0 of 2 sockets."
 				
 				// Object bugzilla, Boolean is_guest, String cpu_sockets, SubscriptionPool pool
-				ll.add(Arrays.asList(new Object[]{null,	false,	new Integer(1),	pool}));
-				ll.add(Arrays.asList(new Object[]{null,	false,	new Integer(2),	pool}));
-				ll.add(Arrays.asList(new Object[]{null,	false,	new Integer(5),	pool}));
-				ll.add(Arrays.asList(new Object[]{null,	true,	new Integer(1),	pool}));
-				ll.add(Arrays.asList(new Object[]{null,	true,	new Integer(2),	pool}));
-				ll.add(Arrays.asList(new Object[]{null,	true,	new Integer(5),	pool}));
+				ll.add(Arrays.asList(new Object[]{blockedByBzBug,	false,	new Integer(1),	pool}));
+				ll.add(Arrays.asList(new Object[]{blockedByBzBug,	false,	new Integer(2),	pool}));
+				ll.add(Arrays.asList(new Object[]{blockedByBzBug,	false,	new Integer(5),	pool}));
+				ll.add(Arrays.asList(new Object[]{null,				true,	new Integer(1),	pool}));
+				ll.add(Arrays.asList(new Object[]{null,				true,	new Integer(2),	pool}));
+				ll.add(Arrays.asList(new Object[]{null,				true,	new Integer(5),	pool}));
 				
 				// keep a quantity map of the instance based pools we are testing
 				poolProductIdsQuantityMap.put(pool.productId, Integer.valueOf(pool.quantity));

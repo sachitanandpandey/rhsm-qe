@@ -51,10 +51,11 @@ public class ManifestTests extends SubscriptionManagerCLITestScript {
 			priority=5, enabled=true)
 	//@ImplementsNitrateTest(caseId=)
 	public void RCTDumpManifestTwice_Test() throws Exception {
-		SSHCommandResult dumpResult;
+		if (manifestFiles.isEmpty()) throw new SkipException("No manifest files have been loaded.");
 		
 		// execute and assert rct dump-manifest MANIFEST_FILE
 		File manifestFile = manifestFiles.get(randomGenerator.nextInt(manifestFiles.size())); // randomly pick a manifest file to test
+		SSHCommandResult dumpResult;
 		dumpResult = RemoteFileTasks.runCommandAndAssert(client, "cd "+manifestFile.getParent()+" && rct dump-manifest "+manifestFile, 0);
 		Assert.assertEquals(dumpResult.getStdout().trim(), "The manifest has been dumped to the current directory", "stdout from rct dump-manifest");
 		dumpResult = RemoteFileTasks.runCommandAndAssert(client, "cd "+manifestFile.getParent()+" && rct dump-manifest "+manifestFile, 0);
@@ -319,16 +320,15 @@ public class ManifestTests extends SubscriptionManagerCLITestScript {
 	public void fetchManifestsBeforeClass() {
 		if (clienttasks==null) return;
 		
-		RemoteFileTasks.runCommandAndAssert(client, "mkdir -p "+manifestsDir, Integer.valueOf(0));
-		RemoteFileTasks.runCommandAndAssert(client, "rm -rf "+manifestsDir+"/*", Integer.valueOf(0));
-		
 		// fetch the manifest files
-		if (sm_manifestsUrl.isEmpty()) return; 
-		log.info("Fetching test manifests from "+sm_manifestsUrl+" for use by this test class...");
-		RemoteFileTasks.runCommandAndAssert(client, "cd "+manifestsDir+" && wget --quiet --recursive --level 1 --no-parent --accept .zip "+sm_manifestsUrl, Integer.valueOf(0)/*,null,"Downloaded: \\d+ files"*/);
+		RemoteFileTasks.runCommandAndAssert(client, "rm -rf "+manifestsDir+" && mkdir -p "+manifestsDir, Integer.valueOf(0));
+		if (!sm_manifestsUrl.isEmpty()) {
+			log.info("Fetching test manifests from "+sm_manifestsUrl+" for use by this test class...");
+			RemoteFileTasks.runCommandAndAssert(client, "cd "+manifestsDir+" && wget --quiet --recursive --level 1 --no-parent --accept .zip "+sm_manifestsUrl, Integer.valueOf(0)/*,null,"Downloaded: \\d+ files"*/);
+		}
 		
 		// store the manifest files in a list
-		SSHCommandResult result = RemoteFileTasks.runCommandAndAssert(client, "find "+manifestsDir+" -name *.zip", 0);
+		SSHCommandResult result = RemoteFileTasks.runCommandAndAssert(client, "find "+manifestsDir+" -name \"*.zip\"", 0);
 		for (String manifestPathname : result.getStdout().split("\\s*\\n\\s*")) {
 			if (manifestPathname.isEmpty()) continue;
 			manifestFiles.add(new File(manifestPathname));

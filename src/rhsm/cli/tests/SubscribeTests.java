@@ -59,6 +59,9 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 	//@ImplementsNitrateTest(caseId=)
 	public void SubscribeToSubscriptionPoolProductId_Test(String productId, JSONArray bundledProductDataAsJSONArray) throws Exception {
 		
+		// is this system a virtual guest system or a physical system
+		boolean systemIsGuest = Boolean.valueOf(clienttasks.getFactValue("virt.is_guest"));
+		
 		// begin test with a fresh register
 		clienttasks.unregister(null, null, null);
 		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, null, false, null, null, null);
@@ -202,6 +205,7 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 					
 					// decide what the status should be...  "Subscribed" or "Partially Subscribed" (SPECIAL CASE WHEN poolProductSocketsAttribute=0  or "null" SHOULD YIELD Subscribed)
 					String poolProductSocketsAttribute = CandlepinTasks.getPoolProductAttributeValue(sm_clientUsername, sm_clientPassword, sm_serverUrl, pool.poolId, "sockets");
+					String poolProductVcpuAttribute = CandlepinTasks.getPoolProductAttributeValue(sm_clientUsername, sm_clientPassword, sm_serverUrl, pool.poolId, "vcpu");	// introduced by 885785 [RFE] Subscription Manager should alert a user if subscription vcpu limits are lower than system vcpu allocation
 					// treat a non-numeric poolProductSocketsAttribute as if it was null
 					// if the sockets attribute is not numeric (e.g. "null"),  then this subscription should be available to this client
 					try {Integer.valueOf(poolProductSocketsAttribute);}
@@ -211,18 +215,22 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 						poolProductSocketsAttribute = null;
 					}
 					
-					// consider the socket coverage and assert the installed product's status 
+					// consider the socket/vcpu coverage and assert the installed product's status 
 					if (pool.subscriptionType!=null && pool.subscriptionType.equals("Other")) {
 						Assert.fail("Encountered a subscription pool of type '"+pool.subscriptionType+"'.  Do not know how to assert the installedProduct.status after subscribing to pool: "+pool);
 				    } else if (pool.multiEntitlement==null && pool.subscriptionType!=null && pool.subscriptionType.isEmpty()) {
 				    	log.warning("Encountered a pool with an empty value for subscriptionType (indicative of an older candlepin server): "+pool);
 				    	log.warning("After subscribing to a pool for ProductId '"+productId+", skipping assertion of the installed product status for products provided by this pool: "+pool);
-					} else if (pool.multiEntitlement!=null && !pool.multiEntitlement/*ADDED AFTER IMPLEMENTATION OF BUG 1008647*/ && poolProductSocketsAttribute!=null && Integer.valueOf(poolProductSocketsAttribute)<Integer.valueOf(clienttasks.sockets) && Integer.valueOf(poolProductSocketsAttribute)>0) {
-						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing to a pool for ProductId '"+productId+"' (covers '"+poolProductSocketsAttribute+"' sockets), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's sockets value ("+clienttasks.sockets+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
-					} else if (pool.subscriptionType!=null && (pool.subscriptionType.equals("Standard") || pool.subscriptionType.equals("Stackable only with other subscriptions"))/*ADDED AFTER IMPLEMENTATION OF BUG 1008647 AND 1029968*/ && poolProductSocketsAttribute!=null && Integer.valueOf(poolProductSocketsAttribute)<Integer.valueOf(clienttasks.sockets) && Integer.valueOf(poolProductSocketsAttribute)>0) {
-						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing to a pool for ProductId '"+productId+"' (covers '"+poolProductSocketsAttribute+"' sockets), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's sockets value ("+clienttasks.sockets+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
+					} else if (pool.multiEntitlement!=null && !pool.multiEntitlement/*ADDED AFTER IMPLEMENTATION OF BUG 1008647*/ && !systemIsGuest/*ADDED AFTER IMPLEMENTATION OF BUG 885785*/ && poolProductSocketsAttribute!=null && Integer.valueOf(poolProductSocketsAttribute)<Integer.valueOf(clienttasks.sockets) && Integer.valueOf(poolProductSocketsAttribute)>0) {
+						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing this physical system to a pool for ProductId '"+productId+"' (covers '"+poolProductSocketsAttribute+"' sockets), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's sockets value ("+clienttasks.sockets+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
+					} else if (pool.subscriptionType!=null && (pool.subscriptionType.equals("Standard") || pool.subscriptionType.equals("Stackable only with other subscriptions"))/*ADDED AFTER IMPLEMENTATION OF BUG 1008647 AND 1029968*/ && !systemIsGuest/*ADDED AFTER IMPLEMENTATION OF BUG 885785*/ && poolProductSocketsAttribute!=null && Integer.valueOf(poolProductSocketsAttribute)<Integer.valueOf(clienttasks.sockets) && Integer.valueOf(poolProductSocketsAttribute)>0) {
+						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing this physical system to a pool for ProductId '"+productId+"' (covers '"+poolProductSocketsAttribute+"' sockets), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's sockets value ("+clienttasks.sockets+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
+					} else if (pool.multiEntitlement!=null && !pool.multiEntitlement/*ADDED AFTER IMPLEMENTATION OF BUG 1008647*/ && systemIsGuest/*ADDED AFTER IMPLEMENTATION OF BUG 885785*/ && poolProductVcpuAttribute!=null && Integer.valueOf(poolProductVcpuAttribute)<Integer.valueOf(clienttasks.vcpu) && Integer.valueOf(poolProductVcpuAttribute)>0) {
+						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing this virtual system to a pool for ProductId '"+productId+"' (covers '"+poolProductVcpuAttribute+"' vcpu), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's vcpu value ("+clienttasks.vcpu+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
+					} else if (pool.subscriptionType!=null && (pool.subscriptionType.equals("Standard") || pool.subscriptionType.equals("Stackable only with other subscriptions"))/*ADDED AFTER IMPLEMENTATION OF BUG 1008647 AND 1029968*/ && systemIsGuest/*ADDED AFTER IMPLEMENTATION OF BUG 885785*/ && poolProductVcpuAttribute!=null && Integer.valueOf(poolProductVcpuAttribute)<Integer.valueOf(clienttasks.vcpu) && Integer.valueOf(poolProductVcpuAttribute)>0) {
+						Assert.assertEquals(installedProduct.status, "Partially Subscribed", "After subscribing this virtual system to a pool for ProductId '"+productId+"' (covers '"+poolProductVcpuAttribute+"' vcpu), the status of Installed Product '"+bundledProductName+"' should be Partially Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the machine's vcpu value ("+clienttasks.vcpu+") is greater than what a single subscription from a non-multi-entitlement pool covers.");
 					} else {
-						Assert.assertEquals(installedProduct.status, "Subscribed", "After subscribing to a pool for ProductId '"+productId+"', the status of Installed Product '"+bundledProductName+"' is Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir);
+						Assert.assertEquals(installedProduct.status, "Subscribed", "After subscribing to a pool for ProductId '"+productId+"', the status of Installed Product '"+bundledProductName+"' is Subscribed since a corresponding product cert was found in "+clienttasks.productCertDir+" and the system's sockets/vcpu needs were met.");
 					}
 					
 					// behavior update after fix from Bug 767619 - Date range for installed products needs to be smarter.
@@ -1227,7 +1235,7 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 		
 		Assert.fail("Do not know how to assert the attempted attachment of '"+pool.subscriptionName+"'.");
 	}
-	@AfterGroups(groups={"setup"}, value={"VerifyOlderClientsAreDeniedEntitlementsToRamAndCoresBasedSubscriptions_Test"})
+	@AfterGroups(groups={"setup"}, value={"VerifyOlderClientsAreDeniedEntitlementsToRamAndCoresBasedSubscriptions_Test","AutoSubscribeOnVirtualSystemsFavorVirtualPools_Test"})
 	@AfterClass(groups={"setup"})	// insurance; not really needed
 	public void deleteFactsFileWithOverridingValues() {
 		clienttasks.deleteFactsFileWithOverridingValues();
@@ -1258,6 +1266,87 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 		
 		return ll;
 	}
+	
+	
+	@Test(	description="subscription-manager: autosubscribe on a virtual system should favor virtual pools",
+			groups={"blockedByBug-927101","AutoSubscribeOnVirtualSystemsFavorVirtualPools_Test"},
+			enabled=true)
+	//@ImplementsNitrateTest(caseId=)
+	public void AutoSubscribeOnVirtualSystemsFavorVirtualPools_Test() throws JSONException, Exception {
+		
+		// force the system to be virtual
+		Map<String, String> factsMap = new HashMap<String, String>();
+		factsMap.put("virt.is_guest", String.valueOf(Boolean.TRUE));
+		clienttasks.createFactsFileWithOverridingValues(factsMap);
+		
+		// get the current product certs
+		List<ProductCert> productCerts = clienttasks.getCurrentProductCerts();
+		
+		// register
+		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, true, false, null, null, null);
+		
+		// get the available pools
+		List<SubscriptionPool> availablePools = clienttasks.getCurrentlyAvailableSubscriptionPools();
+		
+		// find available subscriptions for which both a Virtual and a Physical pool is available
+		boolean testAttempted = false;
+		for (SubscriptionPool virtualPool : SubscriptionPool.findAllInstancesWithMatchingFieldFromList("machineType", "Virtual", availablePools)) {
+			for (SubscriptionPool physicalPool : SubscriptionPool.findAllInstancesWithMatchingFieldFromList("machineType", "Physical", availablePools)) {
+				if (virtualPool.productId.equals(physicalPool.productId)) {
+					// found a pair of subscriptions that we can test
+					
+					// get the product certs that are provided by these pools
+					List<String> virtualProductIds = CandlepinTasks.getPoolProvidedProductIds(sm_clientUsername, sm_clientPassword, sm_serverUrl, virtualPool.poolId);
+					List<String> physicalProductIds = CandlepinTasks.getPoolProvidedProductIds(sm_clientUsername, sm_clientPassword, sm_serverUrl, physicalPool.poolId);
+					Assert.assertTrue(virtualProductIds.containsAll(physicalProductIds)&&physicalProductIds.containsAll(virtualProductIds), "Provided product ids from virtual pool '"+virtualPool.poolId+"' and physical pool '"+physicalPool.poolId+"' sharing a common productId '"+virtualPool.productId+"' should be the same.");
+					
+					// configure a temporary product cert directory containing only these provided product certs
+					RemoteFileTasks.runCommandAndAssert(client,"mkdir -p "+tmpProductCertDir,Integer.valueOf(0));
+					RemoteFileTasks.runCommandAndAssert(client,"rm -f "+tmpProductCertDir+"/*.pem",Integer.valueOf(0));
+					List<String> productCertIdsFound = new ArrayList<String>();
+					List<String> productCertNamesFound = new ArrayList<String>();
+					for (ProductCert productCert : productCerts) {
+						if (virtualProductIds.contains(productCert.productId)) {
+							RemoteFileTasks.runCommandAndAssert(client,"cp "+productCert.file+" "+tmpProductCertDir,Integer.valueOf(0));
+							productCertIdsFound.add(productCert.productId);
+							productCertNamesFound.add(productCert.productName);
+						}
+					}
+					clienttasks.updateConfFileParameter(clienttasks.rhsmConfFile, "productCertDir", tmpProductCertDir);
+					
+					if (!productCertIdsFound.isEmpty()) {
+						
+						// start testing... autosubscribe and assert the consumed subscriptions are Virtual
+						clienttasks.unsubscribe(true, (BigInteger)null, null, null, null);
+						clienttasks.subscribe(true, null, null, (String)null, null, null, null, null, null, null, null);
+						for (ProductSubscription productSubscription : clienttasks.getCurrentlyConsumedProductSubscriptions()) {
+							Assert.assertEquals(productSubscription.machineType, "Virtual", "Autosubscribing a virtual system should favor granting an entitlement from a Virtual pool that provides "+productCertIdsFound+" over a Physical pool that provides "+productCertIdsFound+"'.");
+							Assert.assertTrue(productSubscription.provides.containsAll(productCertNamesFound), "The autosubscribed virtual subscription '"+productSubscription+"' provides for all of the installed products "+productCertNamesFound+".  (Note: This could potentially fail when the provided product names are do not exactly match the installed product cert names which is okay since the productIds are what really matter).");	// TODO We may need to comment this out or fix it if it starts failing due to changes in the subscription data.
+							testAttempted = true;
+						}
+						//testAttempted = true;	// relocated to inside of loop above
+						
+					} else {
+						log.info("Did not find any installed product certs provided by Virtual and Physical subscriptions '"+virtualPool.productId+"'.");
+					}
+				}
+			}
+		}
+		if (!testAttempted) throw new SkipException("Did not find all the resources needed to attempt this test.");
+		
+	}
+	@AfterGroups(groups="setup", value = {"AutoSubscribeOnVirtualSystemsFavorVirtualPools_Test"})
+	public void restoreRhsmProductCertDir() {
+		if (clienttasks==null) return;
+		if (rhsmProductCertDir==null) return;	
+		log.info("Restoring the originally configured product cert directory...");
+		clienttasks.updateConfFileParameter(clienttasks.rhsmConfFile, "productCertDir", rhsmProductCertDir);
+	}
+	protected String rhsmProductCertDir = null;
+	protected final String tmpProductCertDir = "/tmp/sm-tmpProductCertDir";
+	
+	
+	
 	
 	
 	

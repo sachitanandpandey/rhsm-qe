@@ -67,6 +67,7 @@
       (require :reload-all '[rhsm.gui.tests.import_tests :as itest])
       (require :reload-all '[rhsm.gui.tests.system_tests :as systest])
       (require :reload-all '[rhsm.gui.tests.stacking_tests :as stktest])
+      (require :reload-all '[rhsm.gui.tests.repo_tests :as reptest])
 
       (import '[rhsm.base SubscriptionManagerCLITestScript])
       )

@@ -628,6 +628,7 @@ public class EventTests extends SubscriptionManagerCLITestScript{
         // do something that will fire an import created event
 		CandlepinTasks.importConsumerUsingRESTfulAPI(sm_serverAdminUsername,sm_serverAdminPassword,sm_serverUrl,ownerKey,"/tmp/export.zip");
 		String[] newEventTitles = new String[]{"IMPORT CREATED", "POOL CREATED", "SUBSCRIPTION CREATED"};  // Note: the POOL CREATED comes from the subscribed pool
+		List<String> newEventTitlesList = new ArrayList<String>(); newEventTitlesList.addAll(Arrays.asList(newEventTitles));
 		
 		// TEMPORARY WORKAROUND FOR BUG: https://bugzilla.redhat.com/show_bug.cgi?id=721136 - jsefler 07/14/2011
 		boolean invokeWorkaroundWhileBugIsOpen = true;
@@ -643,12 +644,13 @@ public class EventTests extends SubscriptionManagerCLITestScript{
 		
 		// assert the owner feed...
 		//assertTheNewOwnerFeed(ownerKey, oldOwnerFeed, new String[]{"IMPORT CREATED", "POOL CREATED"});
-		assertTheNewOwnerFeed(ownerKey, oldOwnerFeed, newEventTitles);
+		//assertTheNewOwnerFeed(ownerKey, oldOwnerFeed, newEventTitles);
+		assertTheNewOwnerFeedIgnoringEventTitles(ownerKey, oldOwnerFeed, newEventTitles, new HashSet<String>(){{add("POOL CREATED");}});	// could have one or two "POOL CREATED" events, ignore them
 
 		// assert the feed...
 		//assertTheNewFeed(oldFeed, new String[]{"IMPORT CREATED", "POOL CREATED", "SUBSCRIPTION CREATED"});
 		//assertTheNewFeed(oldFeed, newEventTitles);	// TODO 12/6/2012 several POOL MODIFIED may occur between new events POOL CREATED and SUBSCRIPTION CREATED.  Seems to happen when re-running the script after hours of other troubleshooting runs.  Redeploying candlepin and running EventTests does NOT encounter the extraneous POOL MODIFIED event.  We may want change this to...  assertTheNewFeedContains(oldFeed, Arrays.asList(newEventTitles));
-		assertTheNewFeedIgnoringEventTitles(oldFeed, newEventTitles, new HashSet<String>(){{add("POOL MODIFIED");add("RULES MODIFIED");}} );	// TODO 10/24/2013 don't yet understand why "RULES MODIFIED" have randomly started showing up like the POOL MODIFIED events in the comment above
+		assertTheNewFeedIgnoringEventTitles(oldFeed, newEventTitles, new HashSet<String>(){{add("POOL CREATED");add("POOL MODIFIED");add("RULES MODIFIED");}} );	// TODO 10/24/2013 don't yet understand why "RULES MODIFIED" have randomly started showing up like the POOL MODIFIED events in the comment above
 	}
 	
 	

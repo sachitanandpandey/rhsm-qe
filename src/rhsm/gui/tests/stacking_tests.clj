@@ -98,17 +98,17 @@
   setup [_]
   (try
     (if (= "RHEL7" (get-release)) (base/startup nil))
+    (if (bash-bool (:exitcode (run-command (str "test -d " stacking-dir))))
+      (run-command (str "rm -rf " stacking-dir)))
     (tasks/restart-app :reregister? true)
-    (if (not (bash-bool (:exitcode (run-command (str "test -d " stacking-dir)))))
-      (do
-        (run-command (str "mkdir " stacking-dir))
-        (reset! prod-dir-atom (tasks/conf-file-value "productCertDir"))
-        (let [stackable-pems (tasks/get-stackable-pem-files)
-              change-prod-dir (tasks/set-conf-file-value "productCertDir" stacking-dir)
-              ret-val (fn [pem-file] (:exitcode
-                                     (run-command (str "cp  " @prod-dir-atom "/" pem-file "  " stacking-dir))))
-              copy-pem (map ret-val stackable-pems)]
-          copy-pem)))
+    (run-command (str "mkdir " stacking-dir))
+    (reset! prod-dir-atom (tasks/conf-file-value "productCertDir"))
+    (let [stackable-pems (tasks/get-stackable-pem-files)
+          change-prod-dir (tasks/set-conf-file-value "productCertDir" stacking-dir)
+          ret-val (fn [pem-file] (:exitcode
+                                 (run-command (str "cp  " @prod-dir-atom "/" pem-file "  " stacking-dir))))
+          copy-pem (map ret-val stackable-pems)]
+      copy-pem)
     (catch Exception e
       (reset! (skip-groups :stacking) true)
       (throw e))))
@@ -460,7 +460,7 @@
 (defn ^{AfterClass {:groups ["cleanup"]
                      :alwaysRun true}}
   cleanup [_]
-  ;(run-command (str "rm -rf " stacking-dir))
+  (run-command (str "rm -rf " stacking-dir))
   (tasks/set-conf-file-value "productCertDir" @prod-dir-atom)
   (tasks/restart-app))
 

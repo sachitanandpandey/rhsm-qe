@@ -53,7 +53,8 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
                 ;:subscription-assistant-dialog "Subscription Assistant"
                 :subscription-redemption-dialog "Subscription Redemption"
                 :system-preferences-dialog "System Preferences"
-                :warning-dialog "Warning"}))
+                :warning-dialog "Warning"
+                :repositories-dialog "manage_repositories_dialog"}))
 
 
 (def elements
@@ -81,6 +82,7 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
                                     :search
                                     :update-certificates
                                     :view-system-facts
+                                    :repositories
                                     :status-details])
                     {:date-entry "date-entry"
                      :register-system "Register System"
@@ -106,7 +108,9 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
                                  ;; changed BZ 826735
                                  :start-end-date
                                  :subscription
+                                 :subscription-type
                                  :all-available-support-level-and-type
+                                 :all-available-subscription-type
                                  :all-available-subscription])
                     {:product-id "Product ID Text"
                      ;;stacking id removed in BZ 821544
@@ -151,7 +155,9 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
        :update-facts "Update Facts"
        :update-time "Update Time"
        :facts-org "Organization Value"
-       :facts-org-id "Organization ID Value"})
+       :facts-sys-id "System Identity Value"
+       ;:facts-org-id "Organization ID Value"
+       })
     (define-elements (windows :error-dialog)
       {:ok-error "OK"
        :error-msg "lbl[A-Za-z]*"})
@@ -230,7 +236,18 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
        :rhsm-version "Subscription Manager*"
        :next-system-check "Next System Check-in*"
        :license "License"
-       :close-about-dialog "Close"})))
+       :close-about-dialog "Close"})
+    (define-elements (windows :repositories-dialog)
+      {:repo-table "repository_listview"
+       :repo-message "No repositories are available*"
+       :close-repo-dialog "close_button"
+       :repo-remove-override "remove_all_overrides_button"
+       :base-url "SKU Text"
+       :repo-name "Subscription Text"
+       :gpg-check-text "gpgcheck_readonly"
+       :gpg-check-combobox "gpgcheck_combobox"
+       :gpg-check-edit "gpgcheck_edit_button"
+       :gpg-check-remove "gpgcheck_remove_button"})))
 
 
 (def tabs (define-tabs (elements :main-tabgroup)
@@ -238,9 +255,7 @@ and returns a mapping like :registration-settings -> 'Registration Settings'"
                                    :my-subscriptions
                                    :my-installed-products])))
 
-
 (def all-elements (merge windows elements tabs))
-
 
 ;; let clojure keywords represent locators.  When you call locator on
 ;; a keyword, it looks up that keyword in the all-elements map.

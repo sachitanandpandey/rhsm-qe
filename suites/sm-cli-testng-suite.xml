@@ -687,7 +687,20 @@
 			</run>
 		</groups>
 	</test>
-		
+	
+	<test name="CLI: RhsmDebug Tests">
+		<packages>
+			<package name="rhsm.cli.tests" />
+		</packages>
+		<groups>
+			<run>
+				<include name="setup" />
+				<include name="RhsmDebugTests" />
+				<include name="cleanup" />
+			</run>
+		</groups>
+	</test>
+	
 	<test name="CLI: Config Tests">
 		<packages>
 			<package name="rhsm.cli.tests" />

@@ -6,6 +6,7 @@
         [com.redhat.qe.verify :only (verify)]
         [clojure.string :only (split
                                trim
+                               blank?
                                trim-newline)]
         [slingshot.slingshot :only [throw+
                                     try+]]
@@ -19,6 +20,7 @@
   (:import [org.testng.annotations
             BeforeClass
             BeforeGroups
+            AfterGroups
             Test
             DataProvider
             AfterClass]
@@ -224,7 +226,8 @@
        (tasks/set-conf-file-value "hostname" hostname)))))
 
 (defn ^{Test {:groups ["system"
-                       "blockedByBug-920091"]}}
+                       "blockedByBug-920091"
+                       "blockedByBug-1037712"]}}
   cli_unregister_check_traceback
   "Verifies whether it causes traceback when GUI is running and sub-man is unregistered through CLI"
   [_]
@@ -436,7 +439,7 @@
              (if (bool (tasks/ui guiexist :contract-selection-dialog))
                (tasks/ui click :cancel-contract-selection)))))))))
 
-(defn ^{test {:group ["system"
+(defn ^{Test {:group ["system"
                       "blockedByBug-723992"
                       "blockedByBug-1040119"]}}
   check_gui_refresh
@@ -460,5 +463,114 @@
     (finally
      (tasks/unsubscribe_all)
      (tasks/unregister))))
+
+(defn ^{Test {:groups ["system"]
+              :value ["assert_subscription_field"]
+              :dataProvider "subscribed"}}
+  assert_subscription_field
+  "Tests whether the subscripton field in installed view is populated when the entitlement is subscribed"
+  [_ product]
+  (if (= "Subscribed"
+         (tasks/ui getcellvalue :installed-view
+                   (tasks/skip-dropdown :installed-view product) 2))
+    (let [map (ctasks/build-product-map)
+          gui-value (set (clojure.string/split-lines
+                          (tasks/ui gettextvalue :providing-subscriptions)))
+          cli-value (set (get map product))]
+      (verify (clojure.set/subset? cli-value gui-value)))))
+
+(defn ^{AfterGroups {:groups ["system"]
+                     :value ["assert_subscription_field"]
+                     :alwaysRun true}}
+  after_assert_subscription_field
+  [_]
+  (tasks/unsubscribe_all)
+  (tasks/unregister))
+
+(defn ^{Test {:groups ["system"]
+              :value ["check_subscription_type"]
+              :dataProvider "all-subscriptions"}}
+  check_subscription_type_all_subscriptions
+  "Checks for subscription type in all available subscriptions"
+  [_ product]
+  (tasks/ui selecttab :all-available-subscriptions)
+  (tasks/skip-dropdown :all-subscriptions-view product)
+  (verify (not (blank? (tasks/ui gettextvalue :all-available-subscription-type)))))
+
+(defn ^{Test {:groups ["system"]
+              :value ["check_subscription_type"]
+              :dataProvider "my-subscriptions"}}
+  check_subscription_type_my_subscriptions
+  "Checks for subscription type in my subscriptions"
+  [_ product]
+
+  (tasks/ui selecttab :my-subscriptions)
+  (tasks/skip-dropdown :my-subscriptions-view product)
+  (verify (not (blank? (tasks/ui gettextvalue :subscription-type)))))
+
+(defn ^{AfterGroups {:groups ["system"]
+                     :value ["check_subscription_type"]
+                     :alwaysRun true}}
+  after_check_subscription_type
+  [_]
+  (tasks/unsubscribe_all)
+  (tasks/unregister))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; DATA PROVIDERS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn ^{DataProvider {:name "subscribed"}}
+  installed_products [_ & {:keys [debug]
+                       :or {debug false}}]
+  (if-not (assert-skip :system)
+    (do
+      (tasks/restart-app)
+      (tasks/register-with-creds)
+      (tasks/subscribe_all)
+      (tasks/ui selecttab :my-installed-products)
+      (let [subs (into [] (map vector (tasks/get-table-elements
+                                       :installed-view
+                                       0
+                                       :skip-dropdowns? true)))]
+        (if-not debug
+          (to-array-2d subs)
+          subs)))
+    (to-array-2d [])))
+
+(defn ^{DataProvider {:name "all-subscriptions"}}
+  get_subscriptions [_ & {:keys [debug]
+                          :or {debug false}}]
+  (if-not (assert-skip :system)
+    (do
+      (tasks/restart-app)
+      (tasks/register-with-creds)
+      (tasks/search :match-system? false
+                   :do-not-overlap? false)
+      (let [subs (into [] (map vector (tasks/get-table-elements
+                                       :all-subscriptions-view
+                                       0
+                                       :skip-dropdowns? true)))]
+        (if-not debug
+          (to-array-2d subs)
+          subs)))
+    (to-array-2d [])))
+
+(defn ^{DataProvider {:name "my-subscriptions"}}
+  my_subscriptions [_ & {:keys [debug]
+                         :or {debug false}}]
+  (if-not (assert-skip :system)
+    (do
+      (tasks/restart-app :reregister? true)
+      (tasks/subscribe_all)
+      (tasks/ui selecttab :my-subscriptions)
+      (let [subs (into [] (map vector (tasks/get-table-elements
+                                       :my-subscriptions-view
+                                       0
+                                       :skip-dropdowns? true)))]
+        (if-not debug
+          (to-array-2d subs)
+          subs)))
+    (to-array-2d [])))
 
 (gen-class-testng)

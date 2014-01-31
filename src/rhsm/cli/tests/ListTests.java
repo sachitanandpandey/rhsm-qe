@@ -357,6 +357,26 @@ public class ListTests extends SubscriptionManagerCLITestScript{
 	}
 	
 	
+	@Test(	description="subscription-manager: list of available subscriptions should include contract number",
+			groups={"blockedByBug-1007580"},
+			enabled=true)
+	//@ImplementsNitrateTest(caseId=, fromPlan=)
+	public void EnsureListAvailableReportsContract_Test() {
+		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, true, false, null, null, null);
+		
+		// assert the contract value in all available pools
+		boolean availableSubscriptionPoolsDisplayContract=false;
+		for (SubscriptionPool pool : clienttasks.getCurrentlyAllAvailableSubscriptionPools()) {
+			String none = "None";
+			if (pool.contract!=null) {
+				Assert.assertTrue(!pool.contract.equalsIgnoreCase(none), "The contract '"+pool.contract+"' for subscription pool '"+pool.poolId+"' should not be reported as '"+none+"'.");
+				availableSubscriptionPoolsDisplayContract = true;
+			}
+		}
+		Assert.assertTrue(availableSubscriptionPoolsDisplayContract, "Successfully encountered contracts reported in the list of available subscription pools.");
+	}
+	
+	
 	@Test(	description="subscription-manager-cli: RHEL Personal should be the only available subscription to a consumer registered as type person",
 			groups={"EnsureOnlyRHELPersonalIsAvailableToRegisteredPerson_Test"},
 			enabled=true)
@@ -899,7 +919,7 @@ public class ListTests extends SubscriptionManagerCLITestScript{
 		Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(0), "ExitCode from an attempt to attach '"+subscriptionNameForSubscriptionContainingUTF8Character+"'.");
 	}
 	@Test(	description="rct: cat-cert an entitlement containing UTF-8 character(s)",
-			groups={"SubscriptionContainingUTF8CharacterTests","blockedByBug-890296"},
+			groups={"SubscriptionContainingUTF8CharacterTests","blockedByBug-890296","blockedByBug-1048325"},
 			dependsOnMethods={"AttachSubscriptionContainingUTF8Character_Test"},
 			priority=130,
 			enabled=true)
@@ -945,7 +965,8 @@ public class ListTests extends SubscriptionManagerCLITestScript{
 		//	[root@jsefler-6 ~]# echo $?
 		//	1
 		
-		SSHCommandResult sshCommandResult = clienttasks.runCommandWithLang(null, "rct cat-cert "+entitlementCertFiles.get(0));
+		//SSHCommandResult sshCommandResult = clienttasks.runCommandWithLang(null/* null will cause command to be prefixed with PYTHONIOENCODING=ascii */, "rct cat-cert "+entitlementCertFiles.get(0));	// need for PYTHONIOENCODING=ascii workaround was eliminated by bug 1048325
+		SSHCommandResult sshCommandResult = client.runCommandAndWait("rct cat-cert "+entitlementCertFiles.get(0));
 		Assert.assertEquals(sshCommandResult.getExitCode(), Integer.valueOf(0), "ExitCode from an attempt to run rct cat-cert on an entitlement containing UTF-8 character(s)");
 		Assert.assertEquals(sshCommandResult.getStderr().trim(), "", "Stderr from an attempt to run rct cat-cert on an entitlement containing UTF-8 character(s)");
 	}

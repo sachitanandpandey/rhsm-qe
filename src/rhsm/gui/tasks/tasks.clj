@@ -70,9 +70,11 @@
   ([path]
      (start-app path nil (get-default-locale)))
   ([path window lang]
-     (let [pid (ui launchapp path [] 10 1 lang)]
+     (let [ldtp-pid (ui launchapp path [] 10 1 lang)
+           pid (trim (:stdout (run-command (str "pgrep -f " path))))]
        (reset! rhsm-gui-pid pid)
-       (log/info (str "subscripton-manager-gui pid: " @rhsm-gui-pid)))
+       (log/info (str path " pid: " @rhsm-gui-pid))
+       (log/info (str "ldtp pid for " path ": " ldtp-pid )))
      (when window
        (do
          (ui waittillwindowexist window 30)

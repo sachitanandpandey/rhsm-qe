@@ -1281,16 +1281,16 @@ Expected Results:
 		ll.add(Arrays.asList(new Object[] {	null,													"",											ll.get(ll.size()-1).get(2)/* last set */,	new Integer(0),		null,			null}));	
 	
 		// negative tests
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"https:/hostname",							null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"https:hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"http//hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"http/hostname/prefix",						null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"ftp://hostname",							null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"git://hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"878634","1044686"}),				"https://hostname:/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL port could not be parsed",											null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"878634","842845","1044686"}),		"https://hostname:PORT/prefix",				null,			new Integer(255),	"Error parsing baseurl: Server URL port should be numeric",												null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"https://",									null,			new Integer(255),	"Error parsing baseurl: Server URL is just a schema. Should include hostname, and/or port and path",	null}));
-		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),						"http://",									null,			new Integer(255),	"Error parsing baseurl: Server URL is just a schema. Should include hostname, and/or port and path",	null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496","878634"}),				"https://hostname:/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL port could not be parsed",											null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496","878634","842845",}),	"https://hostname:PORT/prefix",				null,			new Integer(255),	"Error parsing baseurl: Server URL port should be numeric",												null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"https:/hostname",							null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"https:hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"http//hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"http/hostname/prefix",						null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"ftp://hostname",							null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"git://hostname/prefix",					null,			new Integer(255),	"Error parsing baseurl: Server URL has an invalid scheme. http:// and https:// are supported",			null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"https://",									null,			new Integer(255),	"Error parsing baseurl: Server URL is just a schema. Should include hostname, and/or port and path",	null}));
+		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						"http://",									null,			new Integer(255),	"Error parsing baseurl: Server URL is just a schema. Should include hostname, and/or port and path",	null}));
 		return ll;
 	}
 	

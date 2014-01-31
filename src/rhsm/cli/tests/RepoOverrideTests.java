@@ -82,16 +82,16 @@ public class RepoOverrideTests extends SubscriptionManagerCLITestScript{
 		repoOverrideNameValueMap.put("baseurl", "https://cdn.redhat.com/repo-override-testing/$releasever/$basearch");
 		repoOverrideNameValueMap.put("test", "value");
 		SSHCommandResult result = clienttasks.repo_override_(null, null, Arrays.asList(yumRepo.id, "foo-bar"), null, repoOverrideNameValueMap, null, null, null);
-		Assert.assertEquals(result.getExitCode(), Integer.valueOf(255), "ExitCode from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);		
-		Assert.assertEquals(result.getStderr().trim(), "The value for name 'baseurl' is not allowed to be overridden.", "Stderr from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);
-		Assert.assertEquals(result.getStdout().trim(), "", "Stdout from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);
+		Assert.assertEquals(result.getExitCode(), Integer.valueOf(1), "ExitCode from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);		
+		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);
+		Assert.assertEquals(result.getStdout().trim(), "Not allowed to override values for: baseurl", "Stdout from an attempt to repo-override the baseurl of yumRepo: "+yumRepo);
 	}
 	
-	@Test(	description="attempt to override a baseUrl (note the uppercase) using subscription-manager repos-override",
+	@Test(	description="attempt to override a bASeUrL (note the case) using subscription-manager repos-override",
 			groups={"blockedByBug-1030604","blockedByBug-1034375"},
 			enabled=true)
 			//@ImplementsNitrateTest(caseId=)
-	public void AttemptToOverrideBaseUrl_Test() {
+	public void AttemptToOverrideBaseurlInMixedCases_Test() {
 		
 		// register
 		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, true, false, null, null, null);
@@ -102,12 +102,26 @@ public class RepoOverrideTests extends SubscriptionManagerCLITestScript{
 		// attempt to override the baseUrl (note the uppercase character)
 		YumRepo yumRepo = yumRepos.get(randomGenerator.nextInt(yumRepos.size())); // randomly pick a YumRepo
 		Map<String,String> repoOverrideNameValueMap = new HashMap<String,String>();
-		String baseUrl = "baseUrl";
+		// attempt to override bASeUrL
+		String baseUrl = "bASeUrL";	// contains mixed case characters
 		repoOverrideNameValueMap.put(baseUrl, "https://cdn.redhat.com/repo-override-testing/$releasever/$basearch");
 		SSHCommandResult result = clienttasks.repo_override_(null, null, Arrays.asList(yumRepo.id, "foo-bar"), null, repoOverrideNameValueMap, null, null, null);
-		Assert.assertEquals(result.getExitCode(), Integer.valueOf(255), "ExitCode from an attempt to repo-override the "+baseUrl+" (note the case) of yumRepo '"+yumRepo.id+"'.");		
-		Assert.assertEquals(result.getStderr().trim(), "The value for name '"+baseUrl.toLowerCase()+"' is not allowed to be overridden.", "Stderr from an attempt to repo-override the '"+baseUrl+"' (note the case) of yumRepo '"+yumRepo.id+"'.");
-		Assert.assertEquals(result.getStdout().trim(), "", "Stdout from an attempt to repo-override the '"+baseUrl+"' (note the case) of yumRepo '"+yumRepo.id+"'.");
+		Assert.assertEquals(result.getExitCode(), Integer.valueOf(1), "ExitCode from an attempt to repo-override the "+baseUrl+" (note the case) of yumRepo '"+yumRepo.id+"'.");		
+		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from an attempt to repo-override the '"+baseUrl+"' (note the case) of yumRepo '"+yumRepo.id+"'.");
+		Assert.assertEquals(result.getStdout().trim(), "Not allowed to override values for: "+baseUrl, "Stdout from an attempt to repo-override the '"+baseUrl+"' (note the case) of yumRepo '"+yumRepo.id+"'.");
+		// attempt to override two bASeUrL and baseurl
+		repoOverrideNameValueMap.put("baseurl", "https://cdn.redhat.com/repo-override-testing/$releasever/$basearch");
+		repoOverrideNameValueMap.put("mirrorlist_expire", "10");	// include another valid parameter for the fun of it
+		result = clienttasks.repo_override_(null, null, Arrays.asList(yumRepo.id, "foo-bar"), null, repoOverrideNameValueMap, null, null, null);
+		Assert.assertEquals(result.getExitCode(), Integer.valueOf(1), "ExitCode from an attempt to repo-override "+baseUrl+" (note the case) and 'baseurl' of yumRepo '"+yumRepo.id+"'.");		
+		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from an attempt to repo-override the '"+baseUrl+"' (note the case) and 'baseurl' of yumRepo '"+yumRepo.id+"'.");
+		Assert.assertEquals(result.getStdout().trim(), "Not allowed to override values for: "+baseUrl+", baseurl", "Stdout from an attempt to repo-override the '"+baseUrl+"' (note the case) and 'baseurl' of yumRepo '"+yumRepo.id+"'.");
+		
+		// verify that no repo overrides have been added (including the valid parameter for the fun of it)
+		result = clienttasks.repo_override(true,null,(String)null,(String)null,null,null,null,null);
+		Assert.assertEquals(result.getStdout().trim(), "This system does not have any content overrides applied to it.", "Stdout from repo-override --list after attempts to add baseurl overrides.");
+		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from repo-override --list after attempts to add baseurl overrides.");
+		Assert.assertEquals(result.getExitCode(), Integer.valueOf(/*1*/0), "ExitCode from repo-override --list after attempts to add baseurl overrides.");
 	}
 	
 	@Test(	description="attempt to add an override for a name baseurl and label using subscription-manager repos-override",
@@ -145,7 +159,7 @@ public class RepoOverrideTests extends SubscriptionManagerCLITestScript{
 	}
 	
 	@Test(	description="attempt to add an override for a name and value that exceed 255 chars",
-			groups={"blockedByBug-1034396","blockedByBug-1033583"},
+			groups={"blockedByBug-1034396","blockedByBug-1033583","blockedByBug-1049001"},
 			enabled=true)
 			//@ImplementsNitrateTest(caseId=)
 	public void AttemptToAddOverridesExceeding255Chars_Test() {
@@ -159,26 +173,28 @@ public class RepoOverrideTests extends SubscriptionManagerCLITestScript{
 		// attempt to create a very long value override
 		repoOverrideNameValueMap.clear();
 		repoOverrideNameValueMap.put("param", "value_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456");
-		result = clienttasks.repo_override(null, null, "repo1", null, repoOverrideNameValueMap, null, null, null);
+		result = clienttasks.repo_override_(null, null, "repo1", null, repoOverrideNameValueMap, null, null, null);
 		//	[root@jsefler-7 ~]# subscription-manager repo-override --repo=repo1 --add=param_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456:value
 		//	Runtime Error Could not execute JDBC batch update at org.postgresql.jdbc2.AbstractJdbc2Statement$BatchResultHandler.handleError:2,598
-		/* TODO after bug 1033583 is addressed
+		// Bug 1033583 ^
+		//	[root@jsefler-7 ~]# subscription-manager repo-override --repo=repo1 --add=param:value_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456
+		//	Name and value of the override must not exceed 255 characters.
 		Assert.assertEquals(result.getExitCode(), Integer.valueOf(1), "ExitCode from an attempt to add a repo-override with a value exceeding 255 chars.");
 		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from an attempt to add a repo-override with a value exceeding 255 chars.");
-		Assert.assertEquals(result.getStdout().trim(), "", "Stdout from an attempt to add a repo-override with a value exceeding 255 chars.");
-		*/
+		Assert.assertEquals(result.getStdout().trim(), "Name and value of the override must not exceed 255 characters.", "Stdout from an attempt to add a repo-override with a value exceeding 255 chars.");
 		
 		// attempt to create a very long parameter override
 		repoOverrideNameValueMap.clear();
 		repoOverrideNameValueMap.put("param_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456", "value");
-		result = clienttasks.repo_override(null, null, "repo1", null, repoOverrideNameValueMap, null, null, null);
+		result = clienttasks.repo_override_(null, null, "repo1", null, repoOverrideNameValueMap, null, null, null);
 		//	[root@jsefler-7 ~]# subscription-manager repo-override --repo=repo1 --add=param:value_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456
 		//	Runtime Error Batch entry 0 update cp_consumer_content_override set created='2013-12-09 11:03:23.169000 -05:00:00', updated='2013-12-09 11:04:42.821000 -05:00:00', consumer_id='8a90874042bf59cd0142c9fe0de12d1c', content_label='repo1', name='param', value='value_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456' where id='8a90874042bf59cd0142d81941a1401a' was aborted.  Call getNextException to see the cause. at org.postgresql.jdbc2.AbstractJdbc2Statement$BatchResultHandler.handleError:2,598
-		/* TODO after bug 1033583 is addressed
+		// Bug 1033583 ^
+		//	[root@jsefler-7 ~]# subscription-manager repo-override --repo=repo1 --add=param_7890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456:value
+		//	Name and value of the override must not exceed 255 characters.
 		Assert.assertEquals(result.getExitCode(), Integer.valueOf(1), "ExitCode from an attempt to add a repo-override with a value exceeding 255 chars.");
 		Assert.assertEquals(result.getStderr().trim(), "", "Stderr from an attempt to add a repo-override with a value exceeding 255 chars.");
-		Assert.assertEquals(result.getStdout().trim(), "", "Stdout from an attempt to add a repo-override with a value exceeding 255 chars.");
-		*/
+		Assert.assertEquals(result.getStdout().trim(), "Name and value of the override must not exceed 255 characters.", "Stdout from an attempt to add a repo-override with a value exceeding 255 chars.");
 	}
 	
 	@Test(	description="attempt to add an override to a non-existant repo (while NOT consuming entitlements)",

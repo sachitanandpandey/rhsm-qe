@@ -169,6 +169,7 @@ public class VirtualizationTests extends SubscriptionManagerCLITestScript {
 
 		// virt.host_type
 		String virtHostType = factsMap.get("virt.host_type");	// = clienttasks.getFactValue("virt.host_type");
+		host_type = host_type.replaceAll("\\s*\\n\\s*", ", ");	// collapse multi-line values into one line... Bug 1018807 - newline in subscription-manager facts output on xen-hvm guest 
 		Assert.assertEquals(virtHostType,host_type,"subscription-manager facts list reports the same virt.host_type value of as returned by "+virtWhatFile);
 
 		// virt.uuid
@@ -203,13 +204,16 @@ public class VirtualizationTests extends SubscriptionManagerCLITestScript {
 		Assert.assertEquals(Boolean.valueOf(virtIsGuest),Boolean.FALSE,"subscription-manager facts list reports virt.is_guest as false when the client is running on bare metal.");
 
 		// virt.host_type
-		String virtWhatStdout = client.runCommandAndWait("virt-what").getStdout().trim();
 		String virtHostType = factsMap.get("virt.host_type");	// = clienttasks.getFactValue("virt.host_type");
-		if (virtWhatStdout.equals("xen\nxen-dom0")) {
-			Assert.assertEquals(virtHostType,virtWhatStdout,"When virt-what reports xen-dom0, subscription-manager should treat virt.host_type as if it were really bare metal.");			
+		String virtWhatStdout = client.runCommandAndWait("virt-what").getStdout().trim();
+		virtWhatStdout = virtWhatStdout.replaceAll("\\s*\\n\\s*", ", ");	// collapse multi-line values into one line... Bug 1018807 - newline in subscription-manager facts output on xen-hvm guest 
+		//if (virtWhatStdout.equals("xen\nxen-dom0")) {
+		if (virtWhatStdout.contains("xen-dom0")) {
+			log.warning("Normally on a bare metal system (indicated by virt.is_guest=false), virt.host_type will be reported as Not Applicable.  An exception to this case occurs when virt-what reports xen-dom0, then virt.host_type will report xen-dem0 and subscription-manager will treat the system as a bare metal system.");
+			Assert.assertEquals(virtHostType,virtWhatStdout);			
 		} else {
 			//Assert.assertEquals(virtHostType,"","subscription-manager facts list reports no value for virt.host_type when run on bare metal.");	// valid assertion prior to bug 726440/722248
-			Assert.assertEquals(virtHostType,"Not Applicable","subscription-manager facts list reports 'Not Applicable' for virt.host_type when run on bare metal.");
+			Assert.assertEquals(virtHostType,"Not Applicable","subscription-manager facts list report for virt.host_type when run on bare metal.");
 		}
 		
 		// virt.uuid
@@ -1214,22 +1218,27 @@ public class VirtualizationTests extends SubscriptionManagerCLITestScript {
 
 		//									Object bugzilla, String host_type
 		ll.add(Arrays.asList(new Object[]{null,	"hyperv"}));
-		ll.add(Arrays.asList(new Object[]{null,	"ibm_systemz\nibm_systemz-direct"}));
-		ll.add(Arrays.asList(new Object[]{null,	"ibm_systemz\nibm_systemz-lpar"}));
-		ll.add(Arrays.asList(new Object[]{null,	"ibm_systemz\nibm_systemz-zvm"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807"}),	"ibm_systemz\nibm_systemz-direct"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807"}),	"ibm_systemz\nibm_systemz-lpar"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807"}),	"ibm_systemz\nibm_systemz-zvm"}));
+		ll.add(Arrays.asList(new Object[]{null,	"linux_vserver\nlinux_vserver-host"}));
+		ll.add(Arrays.asList(new Object[]{null,	"linux_vserver\nlinux_vserver-guest"}));
+		ll.add(Arrays.asList(new Object[]{null,	"lxc"}));
 		ll.add(Arrays.asList(new Object[]{null,	"kvm"}));
 		ll.add(Arrays.asList(new Object[]{null,	"openvz"}));
 		ll.add(Arrays.asList(new Object[]{null,	"powervm_lx86"}));
 		ll.add(Arrays.asList(new Object[]{null,	"qemu"}));
 		ll.add(Arrays.asList(new Object[]{null,	"uml"}));
+		ll.add(Arrays.asList(new Object[]{null,	"virt"}));
+		ll.add(Arrays.asList(new Object[]{null,	"virtage"}));
 		ll.add(Arrays.asList(new Object[]{null,	"virtualage"}));
 		ll.add(Arrays.asList(new Object[]{null,	"virtualbox"}));
 		ll.add(Arrays.asList(new Object[]{null,	"virtualpc"}));
 		ll.add(Arrays.asList(new Object[]{null,	"vmware"}));
-		ll.add(Arrays.asList(new Object[]{null,	"xen\nxen-domU"}));
-		ll.add(Arrays.asList(new Object[]{null,	"xen\nxen-hvm"}));
-		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug("757697"),	"xen\nxen-dom0"}));
-
+		ll.add(Arrays.asList(new Object[]{null,	"xen"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807"}),	"xen\nxen-domU"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807"}),	"xen\nxen-hvm"}));
+		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug(new String[]{"1018807","757697"}),	"xen\nxen-dom0"}));
 
 		return ll;
 	}

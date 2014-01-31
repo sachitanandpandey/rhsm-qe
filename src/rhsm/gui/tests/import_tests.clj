@@ -56,15 +56,18 @@
   (tasks/restart-app))
 
 (defn import-cert [certlocation]
-  (tasks/restart-app)
-  (tasks/ui click :import-certificate)
-  (tasks/ui waittillguiexist :import-dialog)
-  (if-not (tasks/ui showing? :import-dialog "Location:")
-    (try+ (tasks/ui check :text-entry-toggle)
-          (catch Object e (tasks/ui click :text-entry-toggle))))
-  (tasks/ui generatekeyevent certlocation)
-  (tasks/ui click :import-cert)
-  (tasks/checkforerror))
+  (try
+    (tasks/restart-app)
+    (tasks/ui click :import-certificate)
+    (tasks/ui waittillguiexist :import-dialog)
+    (if-not (tasks/ui showing? :import-dialog "Location:")
+      (try+ (tasks/ui check :text-entry-toggle)
+            (catch Object e (tasks/ui click :text-entry-toggle))))
+    (tasks/ui generatekeyevent certlocation)
+    (tasks/ui click :import-cert)
+    (tasks/checkforerror)
+    (catch Exception e
+      (throw e))))
 
 (defn- cert-version-one? []
   (let [version (System/getProperty "sm.client.certificateVersion")]

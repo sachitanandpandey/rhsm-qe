@@ -1208,7 +1208,7 @@ public class ProxyTests extends SubscriptionManagerCLITestScript {
 		if (!username.equals(sm_clientUsername) || !password.equals(sm_clientPassword)) throw new SkipException("These dataProvided parameters are either superfluous or not meaningful for this test.");
 		clienttasks.register_(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, null, null, null, null, null);
 		
-		SSHCommandResult attemptResult = client.runCommandAndWait(clienttasks.rhsmDebugSystemCommand(null, proxy, proxyuser, proxypassword));
+		SSHCommandResult attemptResult = client.runCommandAndWait(clienttasks.rhsmDebugSystemCommand(null, null, proxy, proxyuser, proxypassword));
 		if (exitCode!=null)	Assert.assertEquals(attemptResult.getExitCode(), exitCode, "The exit code from an attempt to "+moduleTask+" using a proxy server.");
 		if (stdout!=null)	Assert.assertEquals(attemptResult.getStdout().trim(), stdout, "The stdout from an attempt to "+moduleTask+" using a proxy server.");
 		if (stderr!=null)	Assert.assertEquals(attemptResult.getStderr().trim(), stderr, "The stderr from an attempt to "+moduleTask+" using a proxy server.");
@@ -1236,7 +1236,7 @@ public class ProxyTests extends SubscriptionManagerCLITestScript {
 		RemoteFileTasks.runCommandAndWait(client,"grep proxy "+clienttasks.rhsmConfFile,TestRecords.action());
 		
 		// attempt the moduleTask with the proxy options
-		SSHCommandResult attemptResult = client.runCommandAndWait(clienttasks.rhsmDebugSystemCommand(null, proxy, proxyuser, proxypassword));
+		SSHCommandResult attemptResult = client.runCommandAndWait(clienttasks.rhsmDebugSystemCommand(null, null, proxy, proxyuser, proxypassword));
 		if (exitCode!=null)	Assert.assertEquals(attemptResult.getExitCode(), exitCode, "The exit code from an attempt to "+moduleTask+" using a proxy server.");
 		if (stdout!=null)	Assert.assertEquals(attemptResult.getStdout().trim(), stdout, "The stdout from an attempt to "+moduleTask+" using a proxy server.");
 		if (stderr!=null)	Assert.assertEquals(attemptResult.getStderr().trim(), stderr, "The stderr from an attempt to "+moduleTask+" using a proxy server.");
@@ -1327,22 +1327,15 @@ public class ProxyTests extends SubscriptionManagerCLITestScript {
 		// TEST PART 1: let's assert that setting the proxy via an environment variable works
 		
 		// assemble the value of the httpProxyVar
-		// HTTPS_PROXY=https://[username:password@]proxyserver
-		// proxy configurations intended for the rhsm.conf [server] configurations
+		// HTTPS_PROXY=https://proxyserver
+		// HTTPS_PROXY=https://proxyserver:proxyport
+		// HTTPS_PROXY=https://username:password@proxyserver:proxyport
+		// proxy configurations intended for CLI proxy options take precedence over the proxy configurations intended for rhsm.conf file
 		httpProxyEnvVar = validHttpProxyEnvVars.get(randomGenerator.nextInt(validHttpProxyEnvVars.size())) + "=https://";
-		if (proxy_userConfig!=null)									httpProxyEnvVar += proxy_userConfig;
-		if (proxy_passwordConfig!=null)								httpProxyEnvVar += ":"+proxy_passwordConfig;
-		if (proxy_userConfig!=null || proxy_passwordConfig!=null)	httpProxyEnvVar += "@";
-		if (proxy_hostnameConfig!=null)								httpProxyEnvVar += proxy_hostnameConfig;
-		if (proxy_portConfig!=null)									httpProxyEnvVar += ":"+proxy_portConfig;
-		// proxy configurations intended for CLI proxy options
-		if (proxy!=null || proxyuser!=null || proxypassword!=null) {
-		httpProxyEnvVar = validHttpProxyEnvVars.get(randomGenerator.nextInt(validHttpProxyEnvVars.size())) + "=https://";
-		if (proxyuser!=null)						httpProxyEnvVar += proxyuser;
-		if (proxypassword!=null)					httpProxyEnvVar += ":"+proxypassword;
-		if (proxyuser!=null || proxypassword!=null)	httpProxyEnvVar += "@";
-		if (proxy!=null)							httpProxyEnvVar += proxy;
-		}
+		if (proxyuser!=null)							httpProxyEnvVar += proxyuser;			else if (proxy_userConfig!=null)		httpProxyEnvVar += proxy_userConfig;
+		if (proxypassword!=null)						httpProxyEnvVar += ":"+proxypassword;	else if (proxy_passwordConfig!=null)	httpProxyEnvVar += ":"+proxy_passwordConfig;
+		if (proxyuser!=null || proxy_userConfig!=null)	httpProxyEnvVar += "@";
+		if (proxy!=null)								httpProxyEnvVar += proxy;				else {if (proxy_hostnameConfig!=null)	httpProxyEnvVar += proxy_hostnameConfig; if (proxy_portConfig!=null)	httpProxyEnvVar += ":"+proxy_portConfig;}
 		
 		// reset the config parameters
 		updateConfFileProxyParameters("", "", "", "");
@@ -1374,6 +1367,9 @@ public class ProxyTests extends SubscriptionManagerCLITestScript {
 			String proxyLogResult = RemoteFileTasks.getTailFromMarkedFile(proxyRunner, proxyLog, proxyLogMarker, clienttasks.ipaddr);	// accounts for multiple tests hitting the same proxy server simultaneously
 			Assert.assertTrue(proxyLogResult.contains(proxyLogGrepPattern), "The tail of proxy server log '"+proxyLog+"' following marker '"+proxyLogMarker+"' contains expected connection '"+proxyLogGrepPattern+"' attempts from "+clienttasks.ipaddr+" to the candlepin server.");
 		}
+		
+		// cleanup
+		clienttasks.unregister_(null, null, null);
 		
 		
 		// TEST PART 2: now let's assert that setting the proxy via CLI option or rhsm.conf take precedence over the environment variable
@@ -1566,7 +1562,7 @@ public class ProxyTests extends SubscriptionManagerCLITestScript {
 		
 		
 		// Object blockedByBug, String username, String password, Sring org, String proxy, String proxyuser, String proxypassword, String proxy_hostnameConfig, String proxy_portConfig, String proxy_userConfig, String proxy_passwordConfig, Integer exitCode, String stdout, String stderr, SSHCommandRunner proxyRunner, String proxyLog, String proxyLogGrepPattern
-		
+		// 									blockedByBug,											username,			password,			org,			proxy,				proxyuser,					proxypassword,				proxy_hostnameConfig,		proxy_portConfig,			proxy_userConfig,			proxy_passwordConfig,		exitCode,				stdout,		stderr,		proxyRunner,	proxyLog,				proxyLogGrepPattern
 		// basic auth proxy test data...
 		ll.add(Arrays.asList(new Object[]{	new BlockedByBzBug("755258"),							sm_clientUsername,	sm_clientPassword,	sm_clientOrg,	null,				null,						null,						sm_basicauthproxyHostname,	sm_basicauthproxyPort,		sm_basicauthproxyUsername,	sm_basicauthproxyPassword,	Integer.valueOf(0),		null,		null,		basicauthproxy,	sm_basicauthproxyLog,	"TCP_MISS"}));
 //debugTesting if(true) return ll;

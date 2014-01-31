@@ -320,7 +320,8 @@ public class IdentityTests extends SubscriptionManagerCLITestScript {
 		
 		// register and remember the original consumer identity
 		clienttasks.register(sm_clientUsername,sm_clientPassword,sm_clientOrg,null,null,null,null, null, null, null, (String)null, null, null, null, true, false, null, null, null);
-		clienttasks.config(null, null, true, new String[]{"rhsmcertd",/*"certFrequency" CHANGED BY BUG 882459 TO*/"certCheckInterval".toLowerCase(),"240"}); clienttasks.restart_rhsmcertd(null, null, false, true);	// make sure that rhsmcertd will not interfere with test
+		clienttasks.config(null, null, true, new String[]{"rhsmcertd",/*"certFrequency" CHANGED BY BUG 882459 TO*/"certCheckInterval".toLowerCase(),"240"});
+		clienttasks.restart_rhsmcertd(null, null, false, true);	// make sure that rhsmcertd will not interfere with test
 		ConsumerCert consumerCert = clienttasks.getCurrentConsumerCert();
 		String consumerCert_md5sum = client.runCommandAndWait("md5sum "+clienttasks.consumerCertFile()).getStdout().trim();
 		String consumerKey_md5sum = client.runCommandAndWait("md5sum "+clienttasks.consumerKeyFile()).getStdout().trim();
@@ -353,8 +354,8 @@ public class IdentityTests extends SubscriptionManagerCLITestScript {
 		result = clienttasks.list_(null, true, null, null, null, null, null, null, null, null, null);
 		Assert.assertEquals(result.getExitCode(),new Integer(255),	"Exitcode expected after the consumer has been deleted on the server-side.");
 		Assert.assertEquals(result.getStdout().trim(),expectedMsg,	"Stdout expected after the consumer has been deleted on the server-side.");
-//		Assert.assertEquals(result.getStderr().trim(),"",			"Stderr expected after the consumer has been deleted on the server-side.");
-		Assert.assertEquals(result.getStderr().trim().replace(ignoreStderr, ""),"",			"Stderr expected after the consumer has been deleted on the server-side (ignoring \""+ignoreStderr+"\").");	// 11/20/2012 RHE64 subscription-manager-1.1.10-1.el6.x86_64  Not sure why this extra ignoreStderr started showing up.
+		Assert.assertEquals(result.getStderr().trim(),"",			"Stderr expected after the consumer has been deleted on the server-side.");
+//		Assert.assertEquals(result.getStderr().trim().replace(ignoreStderr, ""),"",			"Stderr expected after the consumer has been deleted on the server-side (ignoring \""+ignoreStderr+"\").");	// 11/20/2012 RHEL64 subscription-manager-1.1.10-1.el6.x86_64  Not sure why this extra ignoreStderr started showing up.
 		
 		result = clienttasks.refresh_(null, null, null);
 		Assert.assertEquals(result.getExitCode(),new Integer(255),	"Exitcode expected after the consumer has been deleted on the server-side.");
@@ -418,8 +419,7 @@ public class IdentityTests extends SubscriptionManagerCLITestScript {
 		if (clienttasks!=null) {
 			clienttasks.unregister_(null,null,null);
 			clienttasks.clean_(null,null,null);
-			clienttasks.updateConfFileParameter(clienttasks.rhsmConfFile,"consumerCertDir",origConsumerCertDir);
-			//clienttasks.consumerCertDir = origConsumerCertDir;
+			if (origConsumerCertDir!=null) clienttasks.updateConfFileParameter(clienttasks.rhsmConfFile,"consumerCertDir",origConsumerCertDir);
 		}
 	}
 	protected String origConsumerCertDir = null;
@@ -483,8 +483,12 @@ public class IdentityTests extends SubscriptionManagerCLITestScript {
 
 		// String consumerCertDir
 		ll.add(Arrays.asList(new Object[]{null,	clienttasks.consumerCertDir}));
-		ll.add(Arrays.asList(new Object[]{new BlockedByBzBug("1030560"),	"/tmp/consumer"}));
-
+		if (Integer.valueOf(clienttasks.redhatReleaseX)>=7)	{// avoid Bug 1030560 - rhsmcertd fails to update when rhsm.consumerCertDir configuration is changed
+			ll.add(Arrays.asList(new Object[]{null,	"/etc/pki/consumer_TestDir"}));
+		} else {
+			ll.add(Arrays.asList(new Object[]{null,	"/tmp/sm-consumerCertDir"}));
+		}
+		
 		return ll;
 	}
 

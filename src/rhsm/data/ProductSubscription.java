@@ -36,6 +36,7 @@ public class ProductSubscription extends AbstractCommandLineData {
 	public List<String> statusDetails;
 	public String machineType;	// added by bug 1009600 - Show System Type in list --consumed
 	public String poolId;		// added by bug 908671 // Including the pool ID in the certificate required a change to Candlepin.  If the pool ID is not present in the entitlement certificate, subscription-manager will report the pool ID as "Not Available".
+	public String subscriptionType;	// added by bug 1029968 - [RFE] request for new subscription-manager list installed/consumed field called "Subscription Type"
 
 	public SubscriptionPool fromSubscriptionPool;
 	
@@ -84,6 +85,7 @@ public class ProductSubscription extends AbstractCommandLineData {
 		if (statusDetails != null)	string += String.format(" %s='%s'", "statusDetails",statusDetails);
 		if (machineType != null)	string += String.format(" %s='%s'", "machineType",machineType);
 		if (poolId != null)			string += String.format(" %s='%s'", "poolId",poolId);
+		if (subscriptionType != null)	string += String.format(" %s='%s'", "subscriptionType",subscriptionType);
 		if (fromSubscriptionPool != null)		string += String.format(" %s='%s'", "fromPool",fromSubscriptionPool);
 
 		return string.trim();
@@ -234,6 +236,7 @@ public class ProductSubscription extends AbstractCommandLineData {
 		regexes.put("endDate",				"Ends:(.*)");	// Bug 812373 - Terminology Change to Subscription-Manager list --installed & --consumed
 		regexes.put("machineType",			"System Type:(.*)");	// Bug 1009600 - Show System Type in list --consumed; Show System Type in attach confirmation gui dialog.
 		regexes.put("poolId",				"Pool ID:(.*)");	// Bug 908671 - RFE: include pool id in list --consumed
+		regexes.put("subscriptionType",		"Subscription Type:(.*)");	// Bug 1029968 - [RFE] request for new subscription-manager list installed/consumed field called "Subscription Type"
 		
 		List<Map<String,String>> productList = new ArrayList<Map<String,String>>();
 		for(String field : regexes.keySet()){

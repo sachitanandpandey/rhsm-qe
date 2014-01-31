@@ -252,13 +252,13 @@ public class FlexibleBrandingTests extends SubscriptionManagerCLITestScript {
 //			
 //		}
 		clienttasks.subscribe(true, null,(String)null, null, null, null, null, null, null, null, null);
-		client.runCommand("mkdir /root/importedcertDir");
-		client.runCommand("cat "+clienttasks.entitlementCertDir+"/* >> /root/importedcertDir/importedcert.pem");
-		client.runCommand("rm -rf "+Brand_Name);
+		client.runCommandAndWait("mkdir /root/importedcertDir");
+		client.runCommandAndWait("cat "+clienttasks.entitlementCertDir+"/* >> /root/importedcertDir/importedcert.pem");
+		client.runCommandAndWait("rm -rf "+Brand_Name);
 		clienttasks.clean(null, null, null);
 		clienttasks.importCertificate("/root/importedcertDir/importedcert.pem");
 		String result=client.runCommandAndWait("cat "+Brand_Name).getStdout();
-		client.runCommand("rm -rf /root/importedcertDir/importedcert.pem");
+		client.runCommandAndWait("rm -rf /root/importedcertDir/importedcert.pem");
 		Assert.assertEquals(result.trim(), productname.trim());
 		clienttasks.unsubscribe(true,(BigInteger)null, null, null, null);
 		Assert.assertEquals(result.trim(), productname.trim());

@@ -37,6 +37,7 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 			groups={"blockedByBug-655835","blockedByBug-660713","blockedByBug-854312","blockedByBug-907638","blockedByBug-994266"}, dependsOnGroups={},
 			enabled=true)
 	public void VerifyEntitlementsAfterSubscriptionExpires_Test() throws Exception{
+		clienttasks.restart_rhsmcertd(certFrequency, null, false, true);
 
 		// create a subscription pool that will expire 2 minutes from now
 		int endingMinutesFromNow = 2;
@@ -47,7 +48,7 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 		Assert.assertNotNull(expiringPool,"The expiring SubscriptionPool is currently available for subscribing: "+expiringPool);
 
 		// subscribe
-		File expiringCertFile = clienttasks.subscribeToSubscriptionPool(expiringPool,sm_serverAdminUsername,sm_serverAdminPassword,sm_serverUrl);
+		File expiringCertFile = clienttasks.subscribeToSubscriptionPool_(expiringPool);
 		/*EntitlementCert*/ expiringCert = clienttasks.getEntitlementCertFromEntitlementCertFile(expiringCertFile);
 		List <ProductSubscription> expiringProductSubscriptions = ProductSubscription.findAllInstancesWithMatchingFieldFromList("serialNumber", expiringCert.serialNumber, clienttasks.getCurrentlyConsumedProductSubscriptions());
 		Assert.assertMore(expiringProductSubscriptions.size(),0, "Found ProductSubscriptions corresponding to the just subscribed SubscriptionPool: "+expiringPool);
@@ -56,7 +57,7 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 		}
 		
 		// wait for pool to expire
-		sleep(endingMinutesFromNow*60*1000 + 10*1000); // plus a 10 sec buffer
+		sleep(endingMinutesFromNow*60*1000 + 0*1000); // plus a 10 sec buffer
 		
 		// verify that the subscription pool has expired and is therefore not listed in all available; coverage for Bug 655835 - Pools are no longer removed after their expiration date https://github.com/RedHatQE/rhsm-qe/issues/132
 		SubscriptionPool expiredPool = SubscriptionPool.findFirstInstanceWithMatchingFieldFromList("poolId", expiringPoolId, clienttasks.getCurrentlyAllAvailableSubscriptionPools());
@@ -71,6 +72,15 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 		for (ProductSubscription p : expiringProductSubscriptions) {
 			Assert.assertTrue(!currentProductSubscriptions.contains(p),"The expired ProductSubscription '"+p+"' no longer appears as consumed.");
 		}
+		* current behavior is asserted here... */
+		// verify that the expired product subscriptions is still listed among the consumed, but inactive
+		List <ProductSubscription> currentlyConsumedProductSubscriptions = ProductSubscription.parse(clienttasks.list(null,null,true, null, null, null, null, null, null, null, null).getStdout());
+		for (ProductSubscription expiringProductSubscription : expiringProductSubscriptions) {
+			ProductSubscription expiredProductSubscription = ProductSubscription.findFirstInstanceWithMatchingFieldFromList("serialNumber", expiringProductSubscription.serialNumber, currentlyConsumedProductSubscriptions);
+			Assert.assertNotNull(expiredProductSubscription, "Immediately after the consumed subscription '"+expiringProductSubscription.productName+"' serial '"+expiringProductSubscription.serialNumber+"' expires, it should still be found the list of consumed product subscriptions.");
+			Assert.assertTrue(!expiredProductSubscription.isActive, "Immediately after the consumed subscription '"+expiringProductSubscription.productName+"' serial '"+expiringProductSubscription.serialNumber+"' expires, the list of consumed product subscriptions should show it as inActive.");
+		}
+		
 		
 		// verify that the expired entitlement cert file is gone after a trigger of rhsmcertd.certFrequency
 		SubscriptionManagerCLITestScript.sleep(certFrequency*60*1000);
@@ -80,19 +90,7 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 		// verify that the expired entitlement cert file is still gone after another trigger a rhsmcertd.certFrequency
 		SubscriptionManagerCLITestScript.sleep(certFrequency*60*1000);
 		Assert.assertTrue(!RemoteFileTasks.testExists(client,expiringCertFile.getPath()),"After another trigger of the cert frequency, the expired entitlement cert file remains cleaned from the system.");
-		 * current behavior is asserted below... */
 		
-		// verify that the expired product subscriptions is still listed among the consumed, but inactive
-		List <ProductSubscription> currentlyConsumedProductSubscriptions = ProductSubscription.parse(clienttasks.list(null,null,true, null, null, null, null, null, null, null, null).getStdout());
-		for (ProductSubscription expiringProductSubscription : expiringProductSubscriptions) {
-			ProductSubscription expiredProductSubscription = ProductSubscription.findFirstInstanceWithMatchingFieldFromList("serialNumber", expiringProductSubscription.serialNumber, currentlyConsumedProductSubscriptions);
-			Assert.assertNotNull(expiredProductSubscription, "Immediately after the consumed subscription '"+expiringProductSubscription.productName+"' serial '"+expiringProductSubscription.serialNumber+"' expires, it should still be found the list of consumed product subscriptions.");
-			Assert.assertTrue(!expiredProductSubscription.isActive, "Immediately after the consumed subscription '"+expiringProductSubscription.productName+"' serial '"+expiringProductSubscription.serialNumber+"' expires, the list of consumed product subscriptions should show it as inActive.");
-		}
-		
-		// verify that the expired entitlement cert remains after a trigger of rhsmcertd.certFrequency
-		SubscriptionManagerCLITestScript.sleep(certFrequency*60*1000);
-		Assert.assertTrue(RemoteFileTasks.testExists(client,expiringCertFile.getPath()),"The expired entitlement cert file remains on the system after rhsmcertd runs. (It is left for the system user to see it and manually remove it.)");
 	}
 	
 	
@@ -208,12 +206,11 @@ public class ExpirationTests extends SubscriptionManagerCLITestScript {
 		checkTime("candlepin server", server);
 		checkTime("client", client);
 		originalCertFrequency = clienttasks.getConfFileParameter(clienttasks.rhsmConfFile, "rhsmcertd", /*"certFrequency" CHANGED BY BUG 882459 TO*/"certCheckInterval");
-		clienttasks.restart_rhsmcertd(certFrequency, null, false, null);
 	}
 	@AfterClass(groups="setup")
 	public void restoreCertFrequencyAfterClass() throws Exception{
 		if (originalCertFrequency==null) return;
-		clienttasks.restart_rhsmcertd(Integer.valueOf(originalCertFrequency), null, false, null);
+		clienttasks.restart_rhsmcertd(Integer.valueOf(originalCertFrequency), null, false, true);
 	}
 	
 //	@BeforeMethod

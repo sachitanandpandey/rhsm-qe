@@ -946,7 +946,7 @@ public class FactsTests extends SubscriptionManagerCLITestScript{
 	
 	
 	@Test(	description="the facts for net.interface.sit0.mac_address and net.interface.lo.mac_address should not be listed",
-			groups={"blockedByBug-838123"}, dependsOnGroups={},
+			groups={"blockedByBug-838123","blockedByBug-866645"}, dependsOnGroups={},
 			enabled=true)	// TODO re-implement this test after fix for Bug 866645
 	//@ImplementsNitrateTest(caseId=)
 	public void AssertFactsForNetInterfaceMacAddress_Test() {

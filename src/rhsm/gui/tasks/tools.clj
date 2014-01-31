@@ -20,6 +20,7 @@
                   :interop (atom false)
                   :proxy (atom false)
                   :register (atom false)
+                  :repo (atom false)
                   :stacking (atom false)
                   :subscribe (atom false)
                   :system (atom false)})

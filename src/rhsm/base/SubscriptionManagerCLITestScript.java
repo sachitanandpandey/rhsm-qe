@@ -197,7 +197,7 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 				servertasks.statusStandalone	= jsonStatus.getBoolean("standalone");
 				} catch(Exception e){log.warning(e.getMessage());log.warning("You should upgrade your candlepin server!");}
 
-				//	[root@jsefler-r63-server ~]# curl --insecure --user testuser1:password --request GET https://jsefler-f14-candlepin.usersys.redhat.com:8443/candlepin/status --stderr /dev/null | python -msimplejson/tool
+				//	# curl --insecure --user testuser1:password --request GET https://jsefler-f14-candlepin.usersys.redhat.com:8443/candlepin/status --stderr /dev/null | python -msimplejson/tool
 				//	{
 				//	    "release": "1", 
 				//	    "result": true, 
@@ -206,7 +206,7 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 				//	    "version": "0.5.24"
 				//	}
 				
-				//	[root@jsefler-6 ~]# curl --stderr /dev/null --insecure --user ***:*** --request GET http://rubyvip.web.stage.ext.phx2.redhat.com/clonepin/candlepin/status | python -m simplejson/tool
+				//	# curl --stderr /dev/null --insecure --user ***:*** --request GET http://rubyvip.web.stage.ext.phx2.redhat.com/clonepin/candlepin/status | python -m simplejson/tool
 				//	{
 				//	    "managerCapabilities": [
 				//	        "cores", 
@@ -222,6 +222,15 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 				//	    "standalone": false, 
 				//	    "timeUTC": "2013-09-27T13:51:08.783+0000", 
 				//	    "version": "0.8.28"    <=== COULD ALSO BE "0.8.28.0" IF A HOT FIX WAS APPLIED
+				//	}
+				
+				//	# curl -k -u ***:*** https://katellosach.usersys.redhat.com:443/katello/api/status --stderr /dev/null | python -mjson/tool
+				//	{
+				//	    "release": "Katello",
+				//	    "result": true,
+				//	    "standalone": true,
+				//	    "timeUTC": "2014-01-29T09:04:14Z",
+				//	    "version": "1.4.15-1.el6"
 				//	}
 
 				//TODO git candlepin version on hosted stage:
@@ -315,7 +324,7 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 		smt.initializeFieldsFromConfigFile();
 		smt.removeAllCerts(true,true, false);
 		smt.removeAllFacts();
-		smt.initializeRamCoreSockets();
+		smt.initializeSystemComplianceAttributes();
 		smt.removeRhnSystemIdFile();
 		smt.installRepoCaCerts(sm_repoCaCertUrls);
 		smt.setupRhnDefinitions(sm_rhnDefinitionsGitRepository);
@@ -756,6 +765,17 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 	public static <T> boolean isEqualNoOrder(List<T> list1, List<T> list2) {  
 	   return list1.containsAll(list2) && list2.containsAll(list1) && list1.size()==list2.size();
 	   // similar to Assert.assertEqualsNoOrder(Object[] actual, Object[] expected, String message)
+	}
+	
+	/**
+	 * @param <T>
+	 * @param list1
+	 * @param list2
+	 * @return true if list1.containsAny(list2)
+	 */
+	public static <T> boolean doesListOverlapList(List<T> list1, List<T> list2) {
+		for (T list2item : list2) if (list1.contains(list2item)) return true;
+		return false;
 	}
 	
 	static public String joinListToString(List<String> list, String conjunction) {
@@ -2905,22 +2925,24 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 	
 		// negative tests
 //		serverurl= "https://"+server_hostname+":PORT"+server_prefix;									ll.add(Arrays.asList(new Object[] {	null,															serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at "+server_hostname+":PORT"+server_prefix,													null}));
-		serverurl= "https://"+server_hostname+":PORT"+server_prefix;									ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"878634","842845","1044686"}),	serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL port should be numeric",															null}));
 		serverurl= "https://"+server_hostname+(server_port.isEmpty()?"":":"+server_port)+"/PREFIX";		ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug("842885"),									serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at "+server_hostname+(server_port.isEmpty()?":"+defaultPort:":"+server_port)+"/PREFIX",		null}));
 		serverurl= "hostname";																			ll.add(Arrays.asList(new Object[] {	null,															serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at hostname:"+defaultPort+defaultPrefix,													null}));
 		serverurl= "hostname:900";																		ll.add(Arrays.asList(new Object[] {	null,															serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at hostname:900"+defaultPrefix,																null}));
 		serverurl= "hostname:900/prefix";																ll.add(Arrays.asList(new Object[] {	null,															serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at hostname:900/prefix",																	null}));
 		serverurl= "/";																					ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug("830767"),									serverurl,	null,	null,	null,		new Integer(255),	"Unable to reach the server at "+defaultHostname+":"+defaultPort+"/",													null}));
-		serverurl= "https:/hostname/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "https:hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "https//hostname/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "https/hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "ftp://hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "git://hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL has an invalid scheme. http:// and https:// are supported",					null}));
-		serverurl= "https://hostname:/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"878634","1044686"}),			serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL port could not be parsed",					null}));
-		serverurl= "https://hostname:PORT/prefix";														ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"878634","842845","1044686"}),	serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL port should be numeric",					null}));
-		serverurl= "https://";																			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL is just a schema. Should include hostname, and/or port and path",					null}));
-		serverurl= "http://";																			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686"}),					serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl: Server URL is just a schema. Should include hostname, and/or port and path",					null}));
+		serverurl= "https://"+server_hostname+":PORT"+server_prefix;									ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496","878634","842845"}),	serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL port should be numeric",												null}));
+		serverurl= "https://hostname:PORT/prefix";														ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496","878634","842845"}),	serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL port should be numeric",												null}));	
+		serverurl= "https://hostname:/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496","878634"}),				serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL port should be numeric"/*"Error parsing serverurl:\nServer URL port could not be parsed"*/,												null}));
+		serverurl= "https:/hostname/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "https:hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "https//hostname/prefix";															ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "https/hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "ftp://hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "git://hostname/prefix";																ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL has an invalid scheme. http:// and https:// are supported",			null}));
+		serverurl= "https://";																			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL is just a schema. Should include hostname, and/or port and path",		null}));
+		serverurl= "http://";																			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL is just a schema. Should include hostname, and/or port and path",		null}));
+		//TODO serverurl= "DON'T KNOW WHAT TO PUT HERE TO INVOKE THE ERROR; see exceptions.py";			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL can not be empty",	null}));
+		//TODO serverurl= "DON'T KNOW WHAT TO PUT HERE TO INVOKE THE ERROR; see exceptions.py";			ll.add(Arrays.asList(new Object[] {	new BlockedByBzBug(new String[]{"1044686","1054496"}),						serverurl,	null,	null,	null,		new Integer(255),	"Error parsing serverurl:\nServer URL can not be None",		null}));
 		return ll;
 	}
 

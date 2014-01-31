@@ -1,6 +1,5 @@
 package rhsm.cli.tests;
 
-import java.io.File;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +24,7 @@ import com.redhat.qe.auto.testng.TestNGUtils;
 import rhsm.base.ConsumerType;
 import rhsm.base.SubscriptionManagerCLITestScript;
 import rhsm.cli.tasks.CandlepinTasks;
+import rhsm.data.InstalledProduct;
 import rhsm.data.ProductSubscription;
 import rhsm.data.SubscriptionPool;
 
@@ -924,10 +924,12 @@ public class ActivationKeyTests extends SubscriptionManagerCLITestScript {
 			}
 		}
 		// translate the names of the jsonProvidedProducts into a list of string
-		List<String> providedProductsFromActivationKeyPool = new ArrayList<String>();
+		List<String> providedProductNamesFromActivationKeyPool = new ArrayList<String>();
+		List<String> providedProductIdsFromActivationKeyPool = new ArrayList<String>();
 		for (int j = 0; j < jsonProvidedProducts.length(); j++) {
 			JSONObject jsonProvidedProduct = (JSONObject) jsonProvidedProducts.get(j);
-			providedProductsFromActivationKeyPool.add(jsonProvidedProduct.getString("productName"));
+			providedProductNamesFromActivationKeyPool.add(jsonProvidedProduct.getString("productName"));
+			providedProductIdsFromActivationKeyPool.add(jsonProvidedProduct.getString("productId"));
 		}
 		
 		if (assertConsumptionIsLimitedToThisPoolOnly) {
@@ -940,9 +942,16 @@ public class ActivationKeyTests extends SubscriptionManagerCLITestScript {
 			} else {
 				// valid after Bug 1023568 - [RFE] bind requests using activation keys that do not specify a quantity should automatically use the quantity needed to achieve compliance
 				Assert.assertTrue(consumedProductSubscription.quantityUsed>=1, "The actual consumed product subscription quantity of '"+consumedProductSubscription.quantityUsed+"' is >= 1 to achieve compliance since the quantity requested by the pool added in the activation key was null (result of RFE bugzilla 1023568).");
-				// TODO if this subscription was multi-entitlement, then assert that all of the installed products provided by this subscription are fully subscribed
+				// if this subscription was stackable, then assert that all of the installed products provided by this subscription are fully subscribed
+				if (consumedProductSubscription.subscriptionType.equals("Stackable")) {
+					for (InstalledProduct installedProduct : clienttasks.getCurrentlyInstalledProducts()) {
+						if (providedProductIdsFromActivationKeyPool.contains(installedProduct.productId)) {
+							Assert.assertEquals(installedProduct.status,"Subscribed", "Installed Product '"+installedProduct.productName+"' provided by pool '"+consumedProductSubscription.productName+"' attached from a Smart ActivationKey (quantity='"+addQuantity/*null*/+"') should be fully compliant.");
+						}
+					}
+				}
 			}
-			Assert.assertTrue(consumedProductSubscription.provides.containsAll(providedProductsFromActivationKeyPool)&&providedProductsFromActivationKeyPool.containsAll(consumedProductSubscription.provides), "The consumed product subscription provides all the expected products "+providedProductsFromActivationKeyPool+" from the provided products of the pool added in the activation key.");
+			Assert.assertTrue(consumedProductSubscription.provides.containsAll(providedProductNamesFromActivationKeyPool)&&providedProductNamesFromActivationKeyPool.containsAll(consumedProductSubscription.provides), "The consumed product subscription provides all the expected products "+providedProductNamesFromActivationKeyPool+" from the provided products of the pool added in the activation key.");
 		} else {
 // after implementation of bug 908671, these three lines are replaced more efficiently by two lines
 //			List<ProductSubscription> subsetOfConsumedProductSubscriptions = ProductSubscription.findAllInstancesWithMatchingFieldFromList("accountNumber", new BigInteger(jsonPool.getString("accountNumber")), consumedProductSubscriptions);
@@ -950,7 +959,7 @@ public class ActivationKeyTests extends SubscriptionManagerCLITestScript {
 //			Assert.assertNotNull(consumedProductSubscription,"Found a consumed product subscription whose account number '"+jsonPool.getLong("accountNumber")+"' AND contract number '"+jsonPool.getInt("contractNumber")+"' match the pool added to the activation key.");
 			ProductSubscription consumedProductSubscription = ProductSubscription.findFirstInstanceWithMatchingFieldFromList("poolId", jsonPool.getString("id"), consumedProductSubscriptions);
 			Assert.assertNotNull(consumedProductSubscription,"Found a consumed product subscription that came from pool id '"+ jsonPool.getString("id")+"' that was added to the activation key.");
-			Assert.assertTrue(consumedProductSubscription.provides.containsAll(providedProductsFromActivationKeyPool)&&providedProductsFromActivationKeyPool.containsAll(consumedProductSubscription.provides), "The consumed product subscription provides all the expected products "+providedProductsFromActivationKeyPool+" from the provided products of the pool added in the activation key.");
+			Assert.assertTrue(consumedProductSubscription.provides.containsAll(providedProductNamesFromActivationKeyPool)&&providedProductNamesFromActivationKeyPool.containsAll(consumedProductSubscription.provides), "The consumed product subscription provides all the expected products "+providedProductNamesFromActivationKeyPool+" from the provided products of the pool added in the activation key.");
 		}
 	}
 	
@@ -988,7 +997,8 @@ public class ActivationKeyTests extends SubscriptionManagerCLITestScript {
 	}
 	protected List<List<Object>> getRegisterWithActivationKeyContainingPool_TestDataAsListOfLists() throws Exception {
 		List<List<Object>> ll = new ArrayList<List<Object>>();
-		for (List<Object> l : getAllJSONPoolsDataAsListOfLists()) {
+//		for (List<Object> l : getAllJSONPoolsDataAsListOfLists()) {	// takes a long time and rarely reveals a bug, limiting the loop to a random subset...
+		for (List<Object> l : getRandomSubsetOfList(getAllJSONPoolsDataAsListOfLists(),10)) {
 			JSONObject jsonPool = (JSONObject)l.get(0);
 			String keyName = String.format("ActivationKey%s_ForPool%s", System.currentTimeMillis(), jsonPool.getString("id"));
 

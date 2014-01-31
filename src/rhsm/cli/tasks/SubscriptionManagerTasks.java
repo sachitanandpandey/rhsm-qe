@@ -92,6 +92,7 @@ public class SubscriptionManagerTasks {
 	//public final String msg_NetworkErrorUnableToConnect = "Network error, unable to connect to server.\n Please see "+rhsmLogFile+" for more information.";
 	//public final String msg_NetworkErrorUnableToConnect = "Network error, unable to connect to server.\nPlease see "+rhsmLogFile+" for more information."; // effective in RHEL58
 	public final String msg_NetworkErrorUnableToConnect = "Network error, unable to connect to server. Please see "+rhsmLogFile+" for more information."; // effective after subscription-manager commit 3366b1c734fd27faf48313adf60cf051836af115
+	public final String msg_NetworkErrorCheckConnection = "Network error. Please check the connection details, or see "+rhsmLogFile+" for more information.";
 	
 	// will be initialized by initializeFieldsFromConfigFile()
 	public String productCertDir				= null; // "/etc/pki/product";
@@ -109,6 +110,7 @@ public class SubscriptionManagerTasks {
 	public String sockets						= null;	// of the client
 	public String coresPerSocket				= null;	// of the client
 	public String cores							= null;	// of the client
+	public String vcpu							= null;	// of the client
 	public String variant						= null;	// of the client
 	public String releasever					= null;	// of the client	 // e.g. 5Server	// e.g. 5Client
 	
@@ -176,15 +178,17 @@ public class SubscriptionManagerTasks {
 	
 	
 	/**
+	 * Initialize/determine the system values for ram cores vcpu and sockets which are all used in the determination of a system's compliance (depending on the is_guest fact)
 	 * Must be called after installSubscriptionManagerRPMs(...)
+	 * 
 	 */
-	public void initializeRamCoreSockets() {
+	public void initializeSystemComplianceAttributes() {
 		// STORE THE subscription-manager fact for "cpu.cpu_socket(s)".  THIS IS THE VALUE CANDLEPIN USES FOR HARDWARE RULES.
 		removeAllFacts();
 		
 		// sockets
 		String cpuSocketsFact = "cpu.cpu_socket(s)";
-		sockets = getFactValue(cpuSocketsFact);
+		sockets = getFactValue(cpuSocketsFact);	//  (will be ingored for compliance on a virtual system)
 		//Assert.assertTrue(SubscriptionManagerCLITestScript.isInteger(sockets) && Integer.valueOf(sockets)>0, "Subscription manager facts '"+cpuSocketsFact+"' value '"+sockets+"' is a positive integer.");
 		if (!SubscriptionManagerCLITestScript.isInteger(sockets)) {
 			log.warning("When no '"+cpuSocketsFact+"' fact is present, the hardware rules should treat this system as a 1 socket system.  Therefore automation will assume this is a one socket system.");
@@ -199,9 +203,13 @@ public class SubscriptionManagerTasks {
 			log.warning("When no '"+cpuCoresPerSocketFact+"' fact is present, the hardware rules should treat this system as a 1 core_per_socket system.  Therefore automation will assume this is a one core_per_socket system.");
 			coresPerSocket = "1";
 		}
-		cores = String.valueOf(Integer.valueOf(sockets)*Integer.valueOf(coresPerSocket));
+		cores = String.valueOf(Integer.valueOf(sockets)*Integer.valueOf(coresPerSocket));	//  (will be ingored for compliance on a virtual system)
 		
-		//TODO ram
+		// ram
+		// ram = getFactValue("memory.memtotal"); //TODO determine what the ram is on the system; is thgis adequate?
+		
+		// vcpu
+		vcpu = cores;	// vcpu count on a virtual system is treated as equivalent to cores (will be ingored for compliance on a physical system)
 	}
 	
 	
@@ -2294,12 +2302,30 @@ public class SubscriptionManagerTasks {
 		return null;	// not found
 	}
 	
-	public List<ProductCert> getCurrentProductCertsCorrespondingToSubscriptionPool(SubscriptionPool pool) throws JSONException, Exception {
-		List<ProductCert> currentProductCertsCorrespondingToSubscriptionPool = new ArrayList<ProductCert>();
+	/**
+	 * From amongst the currently installed product certs, return those that are provided for by the given pool.
+	 * @param pool
+	 * @return
+	 * @throws JSONException
+	 * @throws Exception
+	 */
+	public List<ProductCert> getCurrentProductCertsProvidedBySubscriptionPool(SubscriptionPool pool) throws JSONException, Exception {
+		return getProductCertsProvidedBySubscriptionPool(getCurrentProductCerts(), pool);
+	}
+	
+	/**
+	 * From amongst the given product certs, return those that are provided for by the given pool.
+	 * @param productCerts
+	 * @param pool
+	 * @return
+	 * @throws JSONException
+	 * @throws Exception
+	 */
+	public List<ProductCert> getProductCertsProvidedBySubscriptionPool(List<ProductCert> productCerts, SubscriptionPool pool) throws JSONException, Exception {
+		List<ProductCert> productCertsProvidedBySubscriptionPool = new ArrayList<ProductCert>();
 //		String hostname = getConfFileParameter(rhsmConfFile, "hostname");
 //		String port = getConfFileParameter(rhsmConfFile, "port");
 //		String prefix = getConfFileParameter(rhsmConfFile, "prefix");
-		List<ProductCert> currentProductCerts = getCurrentProductCerts();
 
 		JSONObject jsonPool = new JSONObject(CandlepinTasks.getResourceUsingRESTfulAPI(this.currentlyRegisteredUsername,this.currentlyRegisteredPassword,SubscriptionManagerBaseTestScript.sm_serverUrl,"/pools/"+pool.poolId));
 		JSONArray jsonProvidedProducts = (JSONArray) jsonPool.getJSONArray("providedProducts");
@@ -2308,10 +2334,10 @@ public class SubscriptionManagerTasks {
 			String providedProductId = jsonProvidedProduct.getString("productId");
 			
 			// is this productId among the installed ProductCerts? if so, add them all to the currentProductCertsCorrespondingToSubscriptionPool
-			currentProductCertsCorrespondingToSubscriptionPool.addAll(ProductCert.findAllInstancesWithMatchingFieldFromList("productId", providedProductId, currentProductCerts));
+			productCertsProvidedBySubscriptionPool.addAll(ProductCert.findAllInstancesWithMatchingFieldFromList("productId", providedProductId, productCerts));
 		}
 		
-		return currentProductCertsCorrespondingToSubscriptionPool;
+		return productCertsProvidedBySubscriptionPool;
 	}
 	
 	public List <EntitlementCert> getEntitlementCertsCorrespondingToProductCert(ProductCert productCert) {
@@ -2463,10 +2489,9 @@ public class SubscriptionManagerTasks {
 //		if (proxyuser!=null)													command += " --proxyuser="+proxyuser;
 //		if (proxypassword!=null)												command += " --proxypassword="+proxypassword;
 		String command = registerCommand(username, password, org, environment, type, name, consumerid, autosubscribe, servicelevel, release, activationkeys, serverurl, insecure, baseurl, force, autoheal, proxy, proxyuser, proxypassword);	
-		
-		// workaround for bug 800323 after master commit 1bc25596afaf294cd217200c605737a43112a378 to avoid stderr: 'ascii' codec can't decode byte 0xe5 in position 13: ordinal not in range(128)
-		// TODO copy this to all of the task_ methods
-		if (!SubscriptionManagerCLITestScript.isStringSimpleASCII(command)) command = "PYTHONIOENCODING=ascii "+command;
+		/* this workaround should no longer be needed after rhel70 fixes by ckozak similar to bugs 1052297 1048325 commit 6fe57f8e6c3c35ac7761b9fa5ac7a6014d69ce20 that employs #!/usr/bin/python -S    sys.setdefaultencoding('utf-8')    import site
+		if (!SubscriptionManagerCLITestScript.isStringSimpleASCII(command)) command = "PYTHONIOENCODING=ascii "+command;	// workaround for bug 800323 after master commit 1bc25596afaf294cd217200c605737a43112a378 to avoid stderr: 'ascii' codec can't decode byte 0xe5 in position 13: ordinal not in range(128)
+		*/
 		
 		// run command without asserting results
 		SSHCommandResult sshCommandResult = sshCommandRunner.runCommandAndWait(command);
@@ -2831,6 +2856,11 @@ public class SubscriptionManagerTasks {
 		return sshCommandResult; // from the import command
 	}
 	
+	/**
+	 * import including assertion that the result is a success
+	 * @param certificate - path to certificate file to be imported (file should contain both the entitlement and key)
+	 * @return
+	 */
 	public SSHCommandResult importCertificate(String certificate/*, String proxy, String proxyuser, String proxypassword*/) {
 		
 		List<String> certificates = certificate==null?null:Arrays.asList(new String[]{certificate});
@@ -4600,6 +4630,10 @@ public class SubscriptionManagerTasks {
 		
 		return newCertFile;
 	}
+	/**
+	 * @param pool
+	 * @return null; Note this overloaded method ALWAYS RETURNS NULL!
+	 */
 	public File subscribeToSubscriptionPool(SubscriptionPool pool)  {
 		return subscribeToSubscriptionPool(pool, null, null, null);
 	}
@@ -6303,7 +6337,9 @@ public class SubscriptionManagerTasks {
 	 * @return
 	 */
 	public SSHCommandResult yumClean (String option) {
-		String command = "yum clean "+option;	//+" --disableplugin=rhnplugin"; // --disableplugin=rhnplugin helps avoid: up2date_client.up2dateErrors.AbuseError
+		String command = "yum clean "+option;
+		//command += " --disableplugin=rhnplugin"; // helps avoid: up2date_client.up2dateErrors.AbuseError
+		command += " --enablerepo=*";	// helps on rhel7
 		//return RemoteFileTasks.runCommandAndAssert(sshCommandRunner,command, 0, "^Cleaning",null);	// don't bother asserting results anymore since rhel7 exitCode is 1 when "There are no enabled repos."	// jsefler 1/26/2013
 		return sshCommandRunner.runCommandAndWait(command);
 	}
@@ -6484,11 +6520,12 @@ public class SubscriptionManagerTasks {
 	/**
 	 * @return the command line syntax for calling rhsm-debug system with these options
 	 */
-	public String rhsmDebugSystemCommand(String destination, String proxy, String proxyuser, String proxypassword) {
+	public String rhsmDebugSystemCommand(String destination, Boolean noArchive, String proxy, String proxyuser, String proxypassword) {
 
 		// assemble the command
 		String command = "rhsm-debug";			command += " system";
 		if (destination!=null)					command += " --destination="+destination;
+		if (noArchive!=null && noArchive)		command += " --no-archive";
 		if (proxy!=null)						command += " --proxy="+proxy;
 		if (proxyuser!=null)					command += " --proxyuser="+proxyuser;
 		if (proxypassword!=null)				command += " --proxypassword="+proxypassword;
@@ -6514,7 +6551,9 @@ public class SubscriptionManagerTasks {
 			lang="LANG="+lang;
 		}
 		String command = lang+" "+rhsmCommand;
+		/* this workaround should no longer be needed after rhel70 fixes by ckozak similar to bugs 1052297 1048325 commit 6fe57f8e6c3c35ac7761b9fa5ac7a6014d69ce20 that employs #!/usr/bin/python -S    sys.setdefaultencoding('utf-8')    import site
 		command = "PYTHONIOENCODING=ascii "+command;	// THIS WORKAROUND IS NEEDED AFTER master commit 056e69dc833919709bbf23d8a7b73a5345f77fdf RHEL6.4 commit 1bc25596afaf294cd217200c605737a43112a378 for bug 800323
+		*/
 		return sshCommandRunner.runCommandAndWait(command);
 	}
 	public SSHCommandResult runCommandWithLangAndAssert(String lang, String rhsmCommand, Integer exitCode, String stdoutRegex, String stderrRegex){
@@ -6536,7 +6575,9 @@ public class SubscriptionManagerTasks {
 			lang="LANG="+lang;
 		}
 		String command = lang+" "+rhsmCommand;
+		/* this workaround should no longer be needed after rhel70 fixes by ckozak similar to bugs 1052297 1048325 commit 6fe57f8e6c3c35ac7761b9fa5ac7a6014d69ce20 that employs #!/usr/bin/python -S    sys.setdefaultencoding('utf-8')    import site
 		command = "PYTHONIOENCODING=ascii "+command;	// THIS WORKAROUND IS NEEDED AFTER master commit 056e69dc833919709bbf23d8a7b73a5345f77fdf RHEL6.4 commit 1bc25596afaf294cd217200c605737a43112a378 for bug 800323
+		*/
 		return RemoteFileTasks.runCommandAndAssert(sshCommandRunner, command, exitCode, stdoutRegexs, stderrRegexs);
 	}
 	

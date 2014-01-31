@@ -3,13 +3,17 @@
         [rhsm.gui.tasks.test-config :only (config
                                            clientcmd)]
         [com.redhat.qe.verify :only (verify)]
-        [clojure.string :only (trim split)]
+        [clojure.string :only (trim
+                               split
+                               split-lines
+                               blank?)]
         [slingshot.slingshot :only [throw+
                                     try+]]
         rhsm.gui.tasks.tools
         gnome.ldtp)
   (:require [clojure.tools.logging :as log]
             [rhsm.gui.tasks.tasks :as tasks]
+            [rhsm.gui.tests.subscribe_tests :as subscribe]
             [rhsm.gui.tests.base :as base]
             [rhsm.gui.tasks.candlepin-tasks :as ctasks]
              rhsm.gui.tasks.ui)
@@ -17,8 +21,10 @@
             BeforeClass
             AfterClass
             BeforeGroups
+            AfterGroups
             Test
             DataProvider]
+           org.testng.SkipException
            [rhsm.cli.tests ComplianceTests]
            [com.redhat.qe.auto.bugzilla BzChecker]))
 
@@ -32,6 +38,7 @@
 (def productmap (atom {}))
 (def common-sla (atom nil))
 (def sla-list (atom nil))
+(def entitlement-map (atom nil))
 
 (defn- dirsetup? [dir]
   (and
@@ -56,13 +63,16 @@
     (tasks/kill-app)
     (reset! complytests (ComplianceTests. ))
     (.setupProductCertDirsBeforeClass @complytests)
-    (reset! common-sla (.toUpperCase
-                        (ComplianceTests/allProductsSubscribableByOneCommonServiceLevelValue)))
-    (reset! sla-list (map #(.toUpperCase %)
-                          (seq (ComplianceTests/allProductsSubscribableByMoreThanOneCommonServiceLevelValues))))
+    (let [safe-upper (fn [s] (if s (.toUpperCase s) nil))]
+      (reset! common-sla
+              (safe-upper (ComplianceTests/allProductsSubscribableByOneCommonServiceLevelValue)))
+      (reset! sla-list
+              (map #(safe-upper %)
+                   (seq (ComplianceTests/allProductsSubscribableByMoreThanOneCommonServiceLevelValues)))))
     (run-command "subscription-manager unregister")
     (tasks/start-app)
     (catch Exception e
+      (log/info "Skipping Test Class: Autosubscribe")
       (reset! (skip-groups :autosubscribe) true)
       (throw e))))
 
@@ -161,6 +171,7 @@
   assert_service_level
   "Asserts that the service level was set system wide after simple autosubscribe."
   [_]
+  (if (nil? @common-sla) (throw (SkipException. "Common SLA is unset!")))
   (verify
    (substring? @common-sla
                      (:stdout (run-command "subscription-manager service-level"))))
@@ -222,13 +233,13 @@
           (verify false)))))
 
 (defn ^{Test {:groups ["autosubscribe"
-                       "configureProductCertDirForAllProductsSubscribableByMoreThanOneCommonServiceLevel"
                        "blockedByBug-1009600"
                        "blockedByBug-1011703"]}}
   check_subscription_type_auto_attach
   "Asserts if type column is present in register dialog"
   [_]
   (try
+    (.configureProductCertDirForAllProductsSubscribableByMoreThanOneCommonServiceLevel @complytests)
     (tasks/restart-app)
     (tasks/register-with-creds)
     (tasks/ui click :auto-attach)
@@ -249,13 +260,13 @@
      (tasks/unregister))))
 
 (defn ^{Test {:groups ["autosubscribe"
-                       "configureProductCertDirForAllProductsSubscribableByMoreThanOneCommonServiceLevel"
                        "blockedByBug-812903"
                        "blockedByBug-1005329"]}}
   autosubscribe_select_product_sla
   "Asserts if autosubscribe works with selecting product sla"
   [_]
   (try
+    (.configureProductCertDirForAllProductsSubscribableByMoreThanOneCommonServiceLevel @complytests)
     (tasks/restart-app)
     (tasks/register-with-creds)
     (tasks/ui click :auto-attach)
@@ -263,7 +274,7 @@
     (tasks/ui waittillwindowexist :register-dialog 80)
     (tasks/ui click :register-dialog (clojure.string/capitalize(first @sla-list)))
     (tasks/ui click :register)
-    (if (tasks/ui showing? :register-dialog "Select Service Level")
+    (if (tasks/ui showing? :register-dialog "Confirm Subscriptions")
       (do
         (sleep 3000)
         (tasks/ui click :register)
@@ -283,7 +294,6 @@
    (if-not (assert-skip :autosubscribe)
      (do
        (.configureProductCertDirForSomeProductsSubscribable @complytests)
-       (run-command "subscription-manager unregister")
        (tasks/restart-app)
        (tasks/register-with-creds)
        (let [prods (into [] (map vector (tasks/get-table-elements
@@ -296,7 +306,6 @@
                          nil
                          (ctasks/get-owner-display-name user pass key))]
          (setup-product-map)
-         (run-command "subscription-manager attach --auto")
 
          (comment
            (tasks/unregister)

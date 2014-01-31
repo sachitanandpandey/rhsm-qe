@@ -11,10 +11,13 @@
         gnome.ldtp)
   (:require [rhsm.gui.tasks.tasks :as tasks]
             [rhsm.gui.tests.base :as base]
+            [clojure.tools.logging :as log]
             [rhsm.gui.tasks.candlepin-tasks :as ctasks])
   (:import [org.testng.annotations
             Test
             BeforeClass
+            BeforeGroups
+            AfterGroups
             DataProvider]))
 
 (def sys-log "/var/log/rhsm/rhsm.log")
@@ -153,6 +156,7 @@ verify_password_tip
 (defn ^{Test {:groups ["registration"
                        "blockedByBug-920091"
                        "blockedByBug-1039753"
+                       "blockedByBug-1037712"
                        "blockedByBug-1034429"]}}
   check_traceback_unregister
   "checks for traceback if any during unregister with GUI open"
@@ -180,7 +184,8 @@ verify_password_tip
     (verify (not (substring? "Traceback" @cmdout)))))
 
 (defn ^{Test {:groups ["registration"
-                       "blockedByBug-891621"]}}
+                       "blockedByBug-891621"]
+              :value ["activation-register"]}}
   check_activation_key_register_dialog
   "checks whether checking activation key option followed by clicking default during
      register proceeds to register dialog and not to activation-key register dialog"
@@ -189,6 +194,7 @@ verify_password_tip
     (if (not (tasks/ui showing? :register-system))
       (tasks/unregister))
     (tasks/ui click :register-system)
+    (tasks/ui waittillguiexist :register-dialog)
     (tasks/ui settextvalue :register-server (ctasks/server-path))
     (tasks/ui check :activation-key-checkbox)
     (tasks/ui click :default-server)
@@ -198,11 +204,18 @@ verify_password_tip
       (tasks/ui gettextvalue :register-dialog "registration_header_label")))
     (finally
       (do
+       (log/info "Finally Closing Dialog...")
        (if (bool (tasks/ui guiexist :register-dialog))
-         (tasks/ui click :register-cancel))
-       (tasks/set-conf-file-value "hostname" (@config :server-hostname))
-       (tasks/set-conf-file-value "port" (@config :server-port))
-       (tasks/set-conf-file-value "prefix" (@config :server-prefix))))))
+         (tasks/ui click :register-cancel))))))
+
+(defn ^{AfterGroups {:groups ["registration"]
+                     :value ["activation-register"]
+                     :alwaysRun true}}
+  after_check_activation_key_register_dialog [_]
+  (tasks/set-conf-file-value "hostname" (@config :server-hostname))
+  (tasks/set-conf-file-value "port" (@config :server-port))
+  (tasks/set-conf-file-value "prefix" (@config :server-prefix))
+  (tasks/restart-app))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; DATA PROVIDERS ;;
