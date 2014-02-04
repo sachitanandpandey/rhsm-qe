@@ -134,7 +134,7 @@ public class GeneralTests extends SubscriptionManagerCLITestScript{
 			RemoteFileTasks.runCommandAndAssert(client, command, Integer.valueOf(0), expectedStdout, null);
 			
 			// verify the logs
-			sleep(100);	// give the message thread time to be logged
+			sleep(1000);	// give the message thread time to be logged
 			String logResult;
 			if (signalMap.get(signal).isEmpty()) {
 				String unExpectedMessage = "Please run subscription-manager for more information.";

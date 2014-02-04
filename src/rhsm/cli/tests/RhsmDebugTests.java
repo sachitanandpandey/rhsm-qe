@@ -61,7 +61,7 @@ public class RhsmDebugTests extends SubscriptionManagerCLITestScript {
 	
 	
 	@Test(	description="after registering and subscribing, call rhsm-debug system with --no-archive option and verify the results",
-			groups={},
+			groups={"blockedByBug-1060730"},
 			enabled=true)
 			//@ImplementsNitrateTest(caseId=)
 	public void RhsmDebugSystemWithNoArchive_Test() {

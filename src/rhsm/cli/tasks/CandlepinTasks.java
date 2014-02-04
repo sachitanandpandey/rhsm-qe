@@ -217,9 +217,9 @@ public class CandlepinTasks {
 		//RemoteFileTasks.runCommandAndAssert(sshCommandRunner, "cd "+serverInstallDir+"/proxy; patch -p2 < "+candlepinRedeemTestsPatchFile.getName(), Integer.valueOf(0), "patching file .*/DefaultSubscriptionServiceAdapter.java", null);
 		RemoteFileTasks.runCommandAndAssert(sshCommandRunner, "cd "+serverInstallDir+" && patch -p2 < "+candlepinRedeemTestsPatchFile.getName(), Integer.valueOf(0), "patching file .*/DefaultSubscriptionServiceAdapter.java", null);
 		
-		// modify the gen-certs file so the candlepin cert is valid for more than one year (make it 10 years)
-		//RemoteFileTasks.searchReplaceFile(sshCommandRunner, serverInstallDir+"/proxy/buildconf/scripts/gen-certs", "\\-days 365 ", "\\-days 3650 ");
-		RemoteFileTasks.searchReplaceFile(sshCommandRunner, serverInstallDir+"/buildconf/scripts/gen-certs", "\\-days 365 ", "\\-days 3650 ");
+		// modify the gen-certs file so the candlepin cert is valid for more than one year (make it 20 years)
+		//RemoteFileTasks.searchReplaceFile(sshCommandRunner, serverInstallDir+"/proxy/buildconf/scripts/gen-certs", "\\-days 365 ", "\\-days 7300 ");
+		RemoteFileTasks.searchReplaceFile(sshCommandRunner, serverInstallDir+"/buildconf/scripts/gen-certs", "\\-days 365 ", "\\-days 7300 ");
 		
 		/* TODO: RE-INSTALL GEMS HELPS WHEN THERE ARE DEPLOY ERRORS
 		RemoteFileTasks.runCommandAndAssert(sshCommandRunner, "for item in $(for gem in $(gem list | grep -v \"\\*\"); do echo $gem; done | grep -v \"(\" | grep -v \")\"); do echo 'Y' | gem uninstall $item -a; done", Integer.valueOf(0), "Successfully uninstalled", null);	// probably only needs to be run once  // for item in $(for gem in $(gem list | grep -v "\*"); do echo $gem; done | grep -v "(" | grep -v ")"); do echo 'Y' | gem uninstall $item -a; done

@@ -130,13 +130,11 @@ public class InteroperabilityTests extends SubscriptionManagerCLITestScript {
 		SSHCommandResult result = client.runCommandAndWait("yum repolist --disableplugin=rhnplugin --enableplugin=subscription-manager");
 		String expectedMsgRHSM = "This system is registered to Red Hat Subscription Management, but is not receiving updates. You can use subscription-manager to assign subscriptions.";
 		Assert.assertTrue(result.getStdout().contains(expectedMsgRHSM), "When registered to RHSM (and all subscriptions have expired), the subscription-manager yum plugin stdout should inform that:\n"+expectedMsgRHSM+"\n");	// Bug 901612 - Subscription-manager-s yum plugin prints warning to stdout instead of stderr.	// Bug 901612 was reverted by Bug 1017354 
-//		Assert.assertTrue(result.getStderr().contains(expectedMsgRHSM), "When registered to RHSM (and all subscriptions have expired), the subscription-manager yum plugin stderr should inform that:\n"+expectedMsgRHSM+"\n");
 		// assert the expired subscriptions message
 		expectedMsgRHSM = "*** WARNING ***\nThe subscription for following product(s) has expired:";
 		for (ProductNamespace productNamespace : expiredEntitlementCert.productNamespaces) expectedMsgRHSM += "\n"+"  - "+productNamespace.name;
 		expectedMsgRHSM += "\n"+"You no longer have access to the repositories that provide these products.  It is important that you apply an active subscription in order to resume access to security and other critical updates. If you don't have other active subscriptions, you can renew the expired subscription.";
 		Assert.assertTrue(result.getStdout().contains(expectedMsgRHSM), "When registered to RHSM (and all subscriptions have expired), the subscription-manager yum plugin stdout should inform that:\n"+expectedMsgRHSM+"\n");	// Bug 901612 - Subscription-manager-s yum plugin prints warning to stdout instead of stderr.	// Bug 901612 was reverted by Bug 1017354 
-//		Assert.assertTrue(result.getStderr().contains(expectedMsgRHSM), "When registered to RHSM (and all subscriptions have expired), the subscription-manager yum plugin stderr should inform that:\n"+expectedMsgRHSM+"\n");
 
 		// assert the registration message (with current subscriptions)
 		//clienttasks.subscribeToSubscriptionPool(clienttasks.getCurrentlyAvailableSubscriptionPools().get(0));	// will fail with java.lang.AssertionError: The list of consumed products is entitled 'Consumed Subscriptions'. expected:<true> but was:<false>
@@ -144,14 +142,14 @@ public class InteroperabilityTests extends SubscriptionManagerCLITestScript {
 		clienttasks.importCertificate("/tmp/Expiredcert.pem");
 		result = client.runCommandAndWait("yum repolist --disableplugin=rhnplugin --enableplugin=subscription-manager");
 		expectedMsgRHSM = "This system is receiving updates from Red Hat Subscription Management.";
-		Assert.assertTrue(result.getStdout().contains(expectedMsgRHSM), "When registered to RHSM (and some subscriptions have expired), the subscription-manager yum plugin stdout should inform that:\n"+expectedMsgRHSM+"\n");	// Bug 901612 - Subscription-manager-s yum plugin prints warning to stdout instead of stderr.	// Bug 901612 was reverted by Bug 1017354 
-//		Assert.assertTrue(result.getStderr().contains(expectedMsgRHSM), "When registered to RHSM (and some subscriptions have expired), the subscription-manager yum plugin stderr should inform that:\n"+expectedMsgRHSM+"\n");
+		//NOT TRUE ANYMORE Assert.assertTrue(result.getStdout().contains(expectedMsgRHSM), "When registered to RHSM (and some subscriptions have expired), the subscription-manager yum plugin stdout should inform that:\n"+expectedMsgRHSM+"\n");	// Bug 901612 - Subscription-manager-s yum plugin prints warning to stdout instead of stderr.	// Bug 901612 was reverted by Bug 1017354 
+		Assert.assertTrue(!(result.getStdout()+result.getStderr()).contains(expectedMsgRHSM), "When registered to RHSM, the subscription-manager yum plugin NO LONGER informs that:\n"+expectedMsgRHSM+"\nFor justification, see https://bugzilla.redhat.com/show_bug.cgi?id=1017354#c12");	// commit 39eadae14eead4bb79978e52d38da2b3e85cba57 1017354: remove msg printed to stderr via yum
+
 		// assert the expired subscriptions message again
 		expectedMsgRHSM = "*** WARNING ***\nThe subscription for following product(s) has expired:";
 		for (ProductNamespace productNamespace : expiredEntitlementCert.productNamespaces) expectedMsgRHSM += "\n"+"  - "+productNamespace.name;
 		expectedMsgRHSM += "\n"+"You no longer have access to the repositories that provide these products.  It is important that you apply an active subscription in order to resume access to security and other critical updates. If you don't have other active subscriptions, you can renew the expired subscription.";
 		Assert.assertTrue(result.getStdout().contains(expectedMsgRHSM), "When registered to RHSM (and some subscriptions have expired), the subscription-manager yum plugin stdout should inform that:\n"+expectedMsgRHSM+"\n");	// Bug 901612 - Subscription-manager-s yum plugin prints warning to stdout instead of stderr.	// Bug 901612 was reverted by Bug 1017354 
-//		Assert.assertTrue(result.getStderr().contains(expectedMsgRHSM), "When registered to RHSM (and some subscriptions have expired), the subscription-manager yum plugin stderr should inform that:\n"+expectedMsgRHSM+"\n");
 	}
 	
 	@Test(	description="When not registered to either RHN nor RHSM, the subscription-manager yum plugin should inform that: This system is not registered to Red Hat Subscription Management. You can use subscription-manager to register.",
@@ -237,7 +235,8 @@ public class InteroperabilityTests extends SubscriptionManagerCLITestScript {
 		// - rebranding RHN Satellite to Red Hat Satellite in client stuff
 		expectedMsgRHN = "This system is not registered with RHN Classic or Red Hat Satellite.\nYou can use rhn_register to register.\nRed Hat Satellite or RHN Classic support will be disabled.";
 		if (Arrays.asList(new String[]{"6.3","5.8","6.2","5.7","6.1"}).contains(clienttasks.redhatReleaseXY)) expectedMsgRHN = "This system is not registered with RHN."+"\n"+"RHN Satellite or RHN Classic support will be disabled.";	
-		Assert.assertTrue((result.getStdout()/*+result.getStderr()*/).contains(expectedMsgRHSM), "When registered to RHSM (and subscribed) but not RHN, the subscription-manager yum plugin should inform that:\n"+expectedMsgRHSM+"\n");
+		//NOT TRUE ANYMORE Assert.assertTrue((result.getStdout()/*+result.getStderr()*/).contains(expectedMsgRHSM), "When registered to RHSM (and subscribed) but not RHN, the subscription-manager yum plugin should inform that:\n"+expectedMsgRHSM+"\n");
+		Assert.assertTrue(!(result.getStdout()+result.getStderr()).contains(expectedMsgRHSM), "When registered to RHSM (and subscribed) but not RHN, the subscription-manager yum plugin NO LONGER informs that:\n"+expectedMsgRHSM+"\nFor justification, see https://bugzilla.redhat.com/show_bug.cgi?id=1017354#c12");	// commit 39eadae14eead4bb79978e52d38da2b3e85cba57 1017354: remove msg printed to stderr via yum
 		if (isRhnClientToolsInstalled) Assert.assertTrue((/*result.getStdout()+*/result.getStderr()).contains(expectedMsgRHN), "When registered to RHSM (and subscribed) but not RHN, the rhnplugin yum plugin should inform that:\n"+expectedMsgRHN+"\n");
 	}
 	
@@ -279,7 +278,8 @@ public class InteroperabilityTests extends SubscriptionManagerCLITestScript {
 		if (Float.valueOf(clienttasks.redhatReleaseXY)>=6.4) expectedMsgRHN = "This system is receiving updates from RHN Classic or RHN Satellite.";
 		if (Integer.valueOf(clienttasks.redhatReleaseX)>=7) {
 			log.warning("With RHEL7 (and beyond), registration to RHN Classic is no longer supported and therefore no base rhel channel (e.g. rhel-x86_64-server-7) will be available.");
-			Assert.assertTrue((result.getStdout()/*+result.getStderr()*/).contains(expectedMsgRHSM), "When registered to both RHN and RHSM (and subscribed), the subscription-manager yum plugin should inform that:\n"+expectedMsgRHSM+"\n");
+			//NOT TRUE ANYMORE Assert.assertTrue((result.getStdout()/*+result.getStderr()*/).contains(expectedMsgRHSM), "When registered to both RHN and RHSM (and subscribed), the subscription-manager yum plugin should inform that:\n"+expectedMsgRHSM+"\n");
+			Assert.assertTrue(!(result.getStdout()+result.getStderr()).contains(expectedMsgRHSM), "When registered to both RHN and RHSM (and subscribed), the subscription-manager yum plugin NO LONGER informs that:\n"+expectedMsgRHSM+"\nFor justification, see https://bugzilla.redhat.com/show_bug.cgi?id=1017354#c12");	// commit 39eadae14eead4bb79978e52d38da2b3e85cba57 1017354: remove msg printed to stderr via yum
 			Assert.assertFalse((result.getStdout()+result.getStderr()).contains(expectedMsgRHN), "When registered to both RHN and RHSM (and subscribed), the rhnplugin yum plugin should inform that:\n"+expectedMsgRHN+"\n");
 			Assert.assertTrue((result.getStdout()+result.getStderr()).contains(expectedMsgRHN_NoChannels), "On RHEL7... When registered to both RHN and RHSM (and subscribed), the rhnplugin yum plugin should inform that:\n"+expectedMsgRHN_NoChannels+"\n");
 			return;

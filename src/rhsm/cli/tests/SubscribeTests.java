@@ -1281,6 +1281,9 @@ public class SubscribeTests extends SubscriptionManagerCLITestScript{
 		
 		// get the current product certs
 		List<ProductCert> productCerts = clienttasks.getCurrentProductCerts();
+		if (rhsmProductCertDir==null) {
+			rhsmProductCertDir = clienttasks.getConfFileParameter(clienttasks.rhsmConfFile, "rhsm", "productCertDir");
+		}
 		
 		// register
 		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null, (String)null, null, null, null, true, false, null, null, null);

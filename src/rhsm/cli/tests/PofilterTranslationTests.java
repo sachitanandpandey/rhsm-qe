@@ -854,6 +854,8 @@ public class PofilterTranslationTests extends SubscriptionManagerCLITestScript {
 				if (pofilterTest.equals("unchanged") && translationFile.getPath().contains("/ta/")) bugIds.add("927990");
 				// Bug 928000 - [ml] unchanged translations for msgids containing the word OPTIONS
 				if (pofilterTest.equals("unchanged") && translationFile.getPath().contains("/ml/")) bugIds.add("928000");
+				// Bug 813268 - [ta_IN] unlocalised strings for subscription-manager identity
+				if (pofilterTest.equals("unchanged") && translationFile.getPath().contains("/ta_IN/")) bugIds.add("813268");
 				
 				// Bug 841011 - [kn] failed pofilter unchanged option test for subscription manager translations
 				if (pofilterTest.equals("doublewords") && translationFile.getPath().contains("/kn/")) bugIds.add("841011");

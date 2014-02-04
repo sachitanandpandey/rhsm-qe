@@ -19,6 +19,7 @@ import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.xmlrpc.XmlRpcException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,6 +32,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.redhat.qe.Assert;
+import com.redhat.qe.auto.bugzilla.BzChecker;
 import com.redhat.qe.auto.tcms.ImplementsNitrateTest;
 import com.redhat.qe.auto.testng.TestNGUtils;
 
@@ -1314,7 +1316,7 @@ public class BugzillaTests extends SubscriptionManagerCLITestScript {
 	 * @throws JSONException
 	 */
 	@Test(description = "verify expiration of entitlement certs", 
-			groups = { "ExpirationOfEntitlementCerts","blockedByBug-907638","blockedByBug-953830"}, enabled = true)
+			groups = {"ExpirationOfEntitlementCerts","blockedByBug-907638","blockedByBug-953830"}, enabled = true)
 		public void ExpirationOfEntitlementCerts() throws JSONException,Exception {
 		int endingMinutesFromNow =1;
 /* unnecessary
@@ -1359,8 +1361,8 @@ public class BugzillaTests extends SubscriptionManagerCLITestScript {
 		
 		// attempt to attach an entitlement from an expired pool
 		String result=clienttasks.subscribe_(null, null, expiringPoolId, null, null, null, null, null, null, null, null).getStdout();	
-		// Stdout: Unable to attach pool with ID '8a908740438be86501438cd57718376c'.: Subscriptions for awesomeos-onesocketib expired on: 1/13/14 1:21 PM.
-		String expiredOnDatePattern = "M/dd/yy h:mm a";	//	1/13/14 1:21 PM
+		// Stdout: Unable to attach pool with ID '8a908740438be86501438cd57718376c'.: Subscriptions for awesomeos-onesocketib expired on: 1/3/14 1:21 PM.
+		String expiredOnDatePattern = "M/d/yy h:mm a";	//	1/3/14 1:21 PM
 		DateFormat expiredOnDateFormat = new SimpleDateFormat(expiredOnDatePattern);
 		String expiredOnString = expiredOnDateFormat.format(endDate.getTime());
 /* 
@@ -1510,46 +1512,61 @@ public class BugzillaTests extends SubscriptionManagerCLITestScript {
 	 * @throws JSONException
 	 */
 	@Test(description = "verify if bind and unbind event is recorded in syslog", 
-			groups = { "VerifyBindAndUnbindInSyslog","blockedByBug-919700"}, enabled = true)
+			groups = {"VerifyBindAndUnbindInSyslog","blockedByBug-919700"}, enabled = true)
 	@ImplementsNitrateTest(caseId=68740)
 	public void VerifyBindAndUnbindInSyslog() throws JSONException,Exception {
-		BigInteger serialnums =null;
-		String poolId=null;
-		clienttasks.register(sm_clientUsername, sm_clientPassword,
-				sm_clientOrg, null, null, null, null, null, null, null,
-				(String) null, null, null, null, true, null, null, null, null);
-	String SyslogMessage="Added subscription for product '";
-	String LogMarker = System.currentTimeMillis()+" Testing ***************************************************************";
-	RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, LogMarker);
-	clienttasks.subscribe(true, (String)null, (String)null, (String)null, null, null, null, null, null, null, null);
-	Assert.assertContainsMatch(RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, LogMarker, null),SyslogMessage);
-
-	
-	SyslogMessage="Removed subscription for ";
-	LogMarker = System.currentTimeMillis()+" Testing ***************************************************************";
-	RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, LogMarker);
-	clienttasks.unsubscribe(true,(BigInteger)null, null, null, null);
-	Assert.assertContainsMatch(RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, LogMarker, null),SyslogMessage);
-	
-	LogMarker = System.currentTimeMillis()+" Testing ***************************************************************";
-	for (SubscriptionPool available : clienttasks.getCurrentlyAllAvailableSubscriptionPools()) {
-		poolId=available.poolId;
-	}
-	
-	SyslogMessage="Added subscription for ";
-	RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, LogMarker);
-	clienttasks.subscribe(null, null, poolId, null, null, null, null, null, null, null, null);
-	Assert.assertContainsMatch(RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, LogMarker, null),SyslogMessage);
+		String logMarker, expectedSyslogMessage, tailFromSyslogFile;
 		
-	for (ProductSubscription consumed : clienttasks.getCurrentlyConsumedProductSubscriptions()) {
-		serialnums=consumed.serialNumber;
-	}
-	SyslogMessage="Removed subscription for ";
-	LogMarker = System.currentTimeMillis()+" Testing ***************************************************************";
-	RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, LogMarker);
-	clienttasks.unsubscribe(null, serialnums, null, null, null);
-	Assert.assertContainsMatch(RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, LogMarker, null),SyslogMessage);
-
+		clienttasks.register(sm_clientUsername, sm_clientPassword,sm_clientOrg, null, null, null, null, null, null, null, (String) null, null, null, null, true, false, null, null, null);
+		
+		logMarker = System.currentTimeMillis()+" Testing Subscribe **********************";
+		RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, logMarker);
+		List<SubscriptionPool> pools = clienttasks.getCurrentlyAvailableSubscriptionPools();
+		List<String> poolIds = new ArrayList<String>(); for (SubscriptionPool pool : pools) poolIds.add(pool.poolId);
+		clienttasks.subscribe(null, null, poolIds, null, null, null, null, null, null, null, null);
+		tailFromSyslogFile = RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, logMarker, null);
+		for (SubscriptionPool pool : pools) {
+			//	Feb  3 12:08:01 jsefler-7 subscription-manager: Added subscription for 'Awesome OS Stackable guest limit 4' contract '2'
+			//	Feb  3 12:08:01 jsefler-7 subscription-manager: Added subscription for product 'Awesome OS Server Bits'
+			expectedSyslogMessage = String.format("%s: Added subscription for '%s' contract '%s'", clienttasks.command, pool.subscriptionName,pool.contract);
+			Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After subscribing to '"+pool.subscriptionName+"', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
+			for (String providedProduct : pool.provides) {
+				// TEMPORARY WORKAROUND FOR BUG: https://bugzilla.redhat.com/show_bug.cgi?id=1016300
+				if (providedProduct.equals("Awesome OS Server Bundled")) {
+					boolean invokeWorkaroundWhileBugIsOpen = true;
+					String bugId="1016300"; 
+					try {if (invokeWorkaroundWhileBugIsOpen&&BzChecker.getInstance().isBugOpen(bugId)) {log.fine("Invoking workaround for "+BzChecker.getInstance().getBugState(bugId).toString()+" Bugzilla "+bugId+".  (https://bugzilla.redhat.com/show_bug.cgi?id="+bugId+")");SubscriptionManagerCLITestScript.addInvokedWorkaround(bugId);} else {invokeWorkaroundWhileBugIsOpen=false;}} catch (XmlRpcException xre) {/* ignore exception */} catch (RuntimeException re) {/* ignore exception */}
+					if (invokeWorkaroundWhileBugIsOpen) {
+						log.warning("Ignoring the provided MKT product '"+providedProduct+"'.  No syslog assertion for this product will be made.");
+						continue;
+					}
+				}
+				// END OF WORKAROUND
+				expectedSyslogMessage = String.format("%s: Added subscription for product '%s'", clienttasks.command, providedProduct);
+				Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After subscribing to '"+pool.subscriptionName+"', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
+			}
+		}	
+		
+		logMarker = System.currentTimeMillis()+" Testing Unsubscribe **********************";
+		RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, logMarker);
+		List<ProductSubscription> productSubscriptions = clienttasks.getCurrentlyConsumedProductSubscriptions();
+		clienttasks.unsubscribe(true,(BigInteger)null, null, null, null);
+		tailFromSyslogFile = RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, logMarker, null);
+		for (ProductSubscription productSubscription : productSubscriptions) {
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for 'Awesome OS Server Bundled (2 Sockets, Standard Support)' contract '3'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Clustering Bits'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Awesome OS Server Bits'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Load Balancing Bits'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Large File Support Bits'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Shared Storage Bits'
+			//	Feb  3 13:32:34 jsefler-7 subscription-manager: Removed subscription for product 'Management Bits'
+			expectedSyslogMessage = String.format("%s: Removed subscription for '%s' contract '%s'", clienttasks.command, productSubscription.productName,productSubscription.contractNumber);
+			Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After unsubscribing from '"+productSubscription.productName+"', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
+			for (String providedProduct : productSubscription.provides) {
+				expectedSyslogMessage = String.format("%s: Removed subscription for product '%s'", clienttasks.command, providedProduct);
+				Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After unsubscribing from '"+productSubscription.productName+"', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
+			}
+		}
 	}
 	
 	/**
@@ -1558,17 +1575,25 @@ public class BugzillaTests extends SubscriptionManagerCLITestScript {
 	 * @throws JSONException
 	 */
 	@Test(description = "verify if register and unregister event is recorded in syslog", 
-			groups = { "VerifyRegisterAndUnregisterInSyslog"}, enabled = true)
+			groups = {"VerifyRegisterAndUnregisterInSyslog"}, enabled = true)
 	@ImplementsNitrateTest(caseId=68749)
 	public void VerifyRegisterAndUnregisterInSyslog() throws JSONException,Exception {
-	clienttasks.register(sm_clientUsername, sm_clientPassword,sm_clientOrg, null, null, null, null, null, null, null,(String) null, null, null, null, true, null, null, null, null);
-	String consumerid=clienttasks.getCurrentConsumerId();
-	String SyslogMessage="Registered system with identity: "+consumerid;
-		RemoteFileTasks.runCommandAndAssert(client,"tail -10 "+clienttasks.messagesLogFile, null, SyslogMessage, null);
-	clienttasks.unregister(null, null, null);	
-	SyslogMessage="Unregistered machine with identity: "+consumerid;
-	RemoteFileTasks.runCommandAndAssert(client,"tail -10 "+clienttasks.messagesLogFile, null, SyslogMessage, null);
-
+		String logMarker, expectedSyslogMessage, tailFromSyslogFile;
+		
+		logMarker = System.currentTimeMillis()+" Testing Register **********************";
+		RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, logMarker);
+		String identity = clienttasks.getCurrentConsumerId(clienttasks.register(sm_clientUsername, sm_clientPassword,sm_clientOrg, null, null, null, null, null, null, null, (String) null, null, null, null, true, false, null, null, null));
+		tailFromSyslogFile = RemoteFileTasks.getTailFromMarkedFile(client, clienttasks.messagesLogFile, logMarker, null);
+		//	Feb  3 12:50:47 jsefler-7 subscription-manager: Registered system with identity: eddfaf6d-e916-49e3-aa71-e33a2c54e1dd
+		expectedSyslogMessage = String.format("%s: Registered system with identity: %s", clienttasks.command, identity);
+		Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After registering', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
+		
+		logMarker = System.currentTimeMillis()+" Testing Unregister **********************";
+		RemoteFileTasks.markFile(client, clienttasks.messagesLogFile, logMarker);
+		clienttasks.unregister(null, null, null);	
+		//	Feb  3 13:39:21 jsefler-7 subscription-manager: Unregistered machine with identity: 231c2b52-4bc8-4458-8d0a-252b1dd82877
+		expectedSyslogMessage = String.format("%s: Unregistered machine with identity: %s", clienttasks.command, identity);
+		Assert.assertTrue(tailFromSyslogFile.contains(expectedSyslogMessage),"After unregistering', syslog '"+clienttasks.messagesLogFile+"' contains expected message '"+expectedSyslogMessage+"'.");
 	}
 	
 	
@@ -2392,34 +2417,58 @@ if (true) throw new SkipException("The remaining test logic in this test needs a
 		clienttasks.register(sm_clientUsername, sm_clientPassword,
 				sm_clientOrg, null, null, null, null, null, null, null,
 				(String) null, null, null, null, true, null, null, null, null);
+/* unnecessary for this test
 		List<String[]> listOfSectionNameValues = new ArrayList<String[]>();
 		listOfSectionNameValues.add(new String[] { "rhsmcertd",
 				"autoAttachInterval".toLowerCase(), "1440" });
 		clienttasks.config(null, null, true, listOfSectionNameValues);
-		Calendar now = new GregorianCalendar();
+*/
 		DateFormat yyyy_MM_dd_DateFormat = new SimpleDateFormat("yyyy-MM-dd");
-		now.add(Calendar.YEAR, 1);
-		now.add(Calendar.DATE, 1);
-		String onDateToTest = yyyy_MM_dd_DateFormat.format(now.getTime());
+		Calendar now = new GregorianCalendar();
+		Calendar nextYear = new GregorianCalendar();
+		nextYear.add(Calendar.YEAR, 1);	nextYear.add(Calendar.DATE, -1);	// one day less than one year
+		String onDateToTest = yyyy_MM_dd_DateFormat.format(nextYear.getTime());
+/* unnecessary for this test
 		clienttasks.unsubscribe(true, (BigInteger) null, null, null, null);
+*/
+/* we can improve the efficiency of this loop
 		List<SubscriptionPool> availOnDate = getAvailableFutureSubscriptionsOndate(onDateToTest);
 		if(availOnDate.size()==0) throw new SkipException(
 				"Sufficient future pools are not available");
 		for (SubscriptionPool subscriptions : availOnDate) {
-			if(!(subscriptions.endDate.before(now))){
+			if(!(subscriptions.endDate.before(nextYear))){
 				clienttasks.subscribe(null, null, subscriptions.poolId, null, null,null, null, null, null, null, null);
 		}
 		}
-		for (ProductSubscription subscriptions : clienttasks.getCurrentlyConsumedProductSubscriptions()) {
-				if(subscriptions.isActive){
-//TODO If the serial number comes from a modifier pool, then this loop may give a "Entitlement Certificate with serial number '6272063836166398810' could not be found."
-//     I would avoid this case by not subscribing to a modifier pool in the prior subscribe loop.	
-					clienttasks.unsubscribe(null, subscriptions.serialNumber, null, null, null);
-				}
+*/
+		List<String> subscriptionPoolIds = new ArrayList<String>();
+		for (SubscriptionPool subscription : clienttasks.getAvailableFutureSubscriptionsOndate(onDateToTest)) {
+			if (!CandlepinTasks.isPoolAModifier(sm_clientUsername, sm_clientPassword, subscription.poolId, sm_serverUrl)) {
+				subscriptionPoolIds.add(subscription.poolId);
+			}
 		}
-		List<Repo> repo = clienttasks.getCurrentlySubscribedRepos();
-		Assert.assertTrue(repo.isEmpty());
-
+		clienttasks.subscribe(null, null, subscriptionPoolIds, null, null, null, null, null, null, null, null);
+		
+		// determine if both active and inactive entitlements are being consumed
+		boolean activeProductSubscriptionsConsumed = false;
+		boolean inactiveProductSubscriptionsConsumed = false;
+		List<ProductSubscription> currentlyConsumedProductSubscriptions = clienttasks.getCurrentlyConsumedProductSubscriptions();
+		for (ProductSubscription subscriptions : currentlyConsumedProductSubscriptions) {
+			if(subscriptions.isActive) activeProductSubscriptionsConsumed = true;
+			if(!subscriptions.isActive) inactiveProductSubscriptionsConsumed = true;
+		}
+		if (!activeProductSubscriptionsConsumed || !inactiveProductSubscriptionsConsumed) {
+			throw new SkipException("This test assumes that both current and future subscriptions are available on '"+onDateToTest+"' which is determined by the subscriptions loaded on the candlepin server."); 
+		}
+		// the following loop will remove all currently active entitlements
+		Assert.assertTrue(!clienttasks.getCurrentlySubscribedRepos().isEmpty(), "There should be entitled repos since we are consuming current entitlements (indicated by Active:True) are attached.");
+		for (ProductSubscription subscriptions : currentlyConsumedProductSubscriptions) {
+			if(subscriptions.isActive) {
+				clienttasks.unsubscribe(null, subscriptions.serialNumber, null, null, null);
+			}
+		}
+		Assert.assertTrue(!clienttasks.getCurrentlyConsumedProductSubscriptions().isEmpty(), "We should still be consuming future entitlements (indicated by Active:False).");
+		Assert.assertTrue(clienttasks.getCurrentlySubscribedRepos().isEmpty(), "There should not be any entitled repos despite the future attached entitlements (indicated by Active:False).");
 	}
 
 	/**
@@ -3091,8 +3140,10 @@ throw new SkipException("Finish implementing this test.  Nothing beyond register
 	 */
 	@Test(description = "verify if rhsmcertd process refresh the identity certificate after every restart", groups = {
 			"VerifyrhsmcertdRefreshIdentityCert", "blockedByBug-827034","blockedByBug-923159",
-	"blockedByBug-827035" }, enabled = true)
-	
+	"blockedByBug-827035" }, enabled = false)
+	// TODO disabling this test for two reasons:
+	//  1. it is dangerous to change the system dates
+	//  2. the network service seems to stop when the date changes breaking the ability to ssh into the system
 	public void VerifyrhsmcertdRefreshIdentityCert() throws JSONException,
 	Exception {
 		

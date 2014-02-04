@@ -6,10 +6,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.json.JSONException;
 import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 import rhsm.base.SubscriptionManagerCLITestScript;
+import rhsm.cli.tasks.CandlepinTasks;
 import rhsm.data.EntitlementCert;
 import rhsm.data.ProductCert;
 import rhsm.data.ProductNamespace;
@@ -54,7 +56,7 @@ public class BrandingTests extends SubscriptionManagerCLITestScript {
 			groups={"AttachSubscriptionsForFlexibleBranding_Test","AcceptanceTests"},
 			priority=100,
 			enabled=true)
-	public void AttachSubscriptionsForFlexibleBranding_Test() {
+	public void AttachSubscriptionsForFlexibleBranding_Test() throws JSONException, Exception {
 		// register
 		clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg, null, null, null, null, null, null, null,(List<String>)null, null, null, null, true, false, null, null, null);
 		
@@ -66,6 +68,7 @@ public class BrandingTests extends SubscriptionManagerCLITestScript {
 		boolean flexibleBrandedSubscriptionsFound = false;
 		// too time consuming for (SubscriptionPool pool : clienttasks.getCurrentlyAvailableSubscriptionPools()) {
 		for (SubscriptionPool pool : getRandomSubsetOfList(clienttasks.getCurrentlyAvailableSubscriptionPools(),10)) {
+			if (CandlepinTasks.isPoolAModifier(sm_clientUsername, sm_clientPassword, pool.poolId, sm_serverUrl)) continue; // skip modifier pools
 			String brandNameBeforeSubscribing = getCurrentBrandName();
 			String brandNameStatBeforeSubscribing = getCurrentBrandNameFileStat();
 			String prettyNameBeforeSubscribing = getCurrentPrettyName();
