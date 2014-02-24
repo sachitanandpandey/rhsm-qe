@@ -237,7 +237,32 @@ public class EnvironmentsTests extends SubscriptionManagerCLITestScript {
 		Assert.assertEquals(actualEnvironments.size(), expectedEnvironments.size(),"The number of environments returned by subscription-manager for user '"+username+"' under org '"+org+"'.");
 	}
 	
+	@BeforeGroups(value={"Libraryas_env"}, groups={"setup"})
+	@Test(description="Library as an Env",enabled=true)
+	public void Libraryas_env(){
+		SSHCommandResult sshCommandResult;
+		//register client to katello server 
+		sshCommandResult=clienttasks.register(sm_clientUsername, sm_clientPassword, sm_clientOrg);
+		
+		sshCommandResult=clienttasks.identity(null, null, null, null, null, null, null);
+		List<String> outputlist = new ArrayList<String>();
+		for (String consoleoutput : sshCommandResult.getStdout().split("\\+-+\\+")[sshCommandResult.getStdout().split("\\+-+\\+").length-1].trim().split("\\n")) {
+			outputlist.add(consoleoutput);
+		}
+		Assert.assertContains(outputlist, "environment name: Library");
+		sshCommandResult=clienttasks.unregister(null,null, null);
+
+		
+//		Assert.assertEquals(outputlist.get(4).trim(), "environment name: Library", "Library reconize as Environmenet");
+//		
+		
+	}
 	
+	protected String envname=null;
+	@BeforeGroups(value={"Register with All Environment"}, groups={"setup"})
+	@Test(description="Register with env other than Library",enabled=true)
+	
+<<<<<<< HEAD
 	@BeforeGroups(value={"Libraryas_env"}, groups={"setup"})
 	@Test(description="Library as an Env",enabled=true)
 	public void Libraryas_env(){
@@ -261,6 +286,41 @@ public class EnvironmentsTests extends SubscriptionManagerCLITestScript {
 //		
 		
 	}
+=======
+	public void All_Env_Register(){
+		SSHCommandResult sshCommandResult;
+
+		clientOrg=clienttasks.getOrgs(sm_clientUsername, sm_clientPassword).get(0).orgKey;
+		sshCommandResult = clienttasks.environments(sm_clientUsername, sm_clientPassword, clientOrg, null, null, null, null, null);
+
+		for (String consoleoutput : sshCommandResult.getStdout().split("\\+-+\\+")[sshCommandResult.getStdout().split("\\+-+\\+").length-1].trim().split("\\n")) 
+		{
+			String[] cout = consoleoutput.split(":");
+			if(cout[0].trim().equals("Name"))
+						{
+						envname = cout[1].trim().replaceAll("\\s", "");
+
+						sshCommandResult=clienttasks.register_(sm_clientUsername, sm_clientPassword, clientOrg, envname, null, null, null, null, null, null, (String)null, null, null, null, null, null, null, null, null);
+						Assert.assertEquals(sshCommandResult.getExitCode(),Integer.valueOf(0),"Client sucessfully registred with "+envname+"environment");
+						sshCommandResult=clienttasks.unregister(null, null, null);
+						}
+		}
+			
+//		System.out.println(envlist{"Name"});
+//		for (String name : envlist){
+//				if (name.contains("Description")){
+					
+//				}
+//				else {
+//					List<Map<String,String>> envname = new ArrayList<Map<String,String>>();
+//					System.out.println(envname);
+//					
+//				}
+//			
+//		}
+			
+}
+>>>>>>> 476d0334b5cc169445e3dd2d71c468a2e7cc8386
 	
 	protected String envname=null;
 	@BeforeGroups(value={"Register with All Environment"}, groups={"setup"})
