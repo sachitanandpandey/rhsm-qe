@@ -157,12 +157,29 @@ public class SubscriptionManagerCLITestScript extends SubscriptionManagerBaseTes
 			}
 		}
 		
-		// fetch the candlepin CA Cert (only when the candlepin server is not hosted)
+		// fetch the candlepin CA Cert (only when the candlepin server is not hosted)Type
 		if (server!=null && !sm_serverType.equals(CandlepinType.hosted)) {
+			System.out.println(sm_serverType);
+			if(server!=null && sm_serverType.equals(CandlepinType.katello)){
+				log.info("Fetching Candlepin CA cert...");
+				serverCaCertFile = new File((getProperty("automation.dir", "/tmp")+"/tmp/"+CandlepinTasks.katelloCACertFile.getName()).replace("tmp/tmp", "tmp"));
+				RemoteFileTasks.getFile(server.getConnection(), serverCaCertFile.getParent(), CandlepinTasks.katelloCACertFile.getPath());
+			}
+			
+			else{
+			log.info("Fetching Candlepin CA cert...");
+			serverCaCertFile = new File((getProperty("automation.dir", "/tmp")+"/tmp/"+servertasks.candlepinCACertFile.getName()).replace("tmp/tmp", "tmp"));
+			RemoteFileTasks.getFile(server.getConnection(), serverCaCertFile.getParent(), servertasks.candlepinCACertFile.getPath());
+			}
+		}
+
+		/*
+		if (server!=null && !sm_serverType.equals(CandlepinType.katello)) {
 			log.info("Fetching Candlepin CA cert...");
 			serverCaCertFile = new File((getProperty("automation.dir", "/tmp")+"/tmp/"+servertasks.candlepinCACertFile.getName()).replace("tmp/tmp", "tmp"));
 			RemoteFileTasks.getFile(server.getConnection(), serverCaCertFile.getParent(), servertasks.candlepinCACertFile.getPath());
 		}
+		*/
 		
 		// setup the client(s) (with the fetched candlepin CA Cert and the generated product certs)
 		for (SubscriptionManagerTasks smt : new SubscriptionManagerTasks[]{client2tasks, client1tasks}) {

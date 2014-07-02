@@ -82,6 +82,7 @@ public class CandlepinTasks {
 	public static final String defaultConfigFile	= "/etc/candlepin/candlepin.conf";
 	public static String rubyClientDir	= "/client/ruby";
 	public static File candlepinCACertFile = new File("/etc/candlepin/certs/candlepin-ca.crt");
+	public static File katelloCACertFile = new File("/etc/pki/katello/certs/katello-ca-stripped.crt");
 	public static String generatedProductsDir	= "/generated_certs";	// "/proxy/generated_certs";
 	public static HttpClient client;
 	CandlepinType serverType = CandlepinType.hosted;

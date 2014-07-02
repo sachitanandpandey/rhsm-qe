@@ -49,7 +49,8 @@ public class SubscriptionManagerBaseTestScript extends TestScript {
 	public String sm_serverInstallDir			= getProperty("sm.server.installDir","");
 	public String sm_serverImportDir			= getProperty("sm.server.importDir","");
 	public String sm_serverBranch				= getProperty("sm.server.branch","");
-	public static CandlepinType sm_serverType	= CandlepinType.valueOf(getProperty("sm.server.type","standalone"));
+//	public static CandlepinType sm_serverType	= CandlepinType.valueOf(getProperty("sm.server.type","standalone"));
+	public static CandlepinType sm_serverType	= CandlepinType.valueOf(getProperty("sm.server.type","katello"));
 	public Boolean sm_serverOld					= Boolean.valueOf(getProperty("sm.server.old","false"));
 	
 	public String sm_client1Hostname			= getProperty("sm.client1.hostname","");
